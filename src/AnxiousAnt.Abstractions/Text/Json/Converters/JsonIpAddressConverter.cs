@@ -1,7 +1,7 @@
 using System.Net;
 using System.Text.Json.Serialization;
 
-namespace AnxiousAnt.Json.Converters;
+namespace AnxiousAnt.Text.Json.Converters;
 
 /// <summary>
 /// A JSON converter for serializing and deserializing <see cref="IPAddress"/> objects.

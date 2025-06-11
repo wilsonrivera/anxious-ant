@@ -1,7 +1,7 @@
 using System.Text.Encodings.Web;
 using System.Text.Json.Serialization;
 
-namespace AnxiousAnt.Json;
+namespace AnxiousAnt.Text.Json;
 
 [JsonSerializable(typeof(string))]
 internal sealed partial class InternalJsonSerializerContext : JsonSerializerContext

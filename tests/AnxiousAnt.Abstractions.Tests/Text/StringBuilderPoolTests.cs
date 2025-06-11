@@ -1,4 +1,4 @@
-namespace AnxiousAnt.ObjectPool;
+namespace AnxiousAnt.Text;
 
 public class StringBuilderPoolTests
 {

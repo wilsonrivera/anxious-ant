@@ -3,7 +3,7 @@
 using System.Globalization;
 
 using AnxiousAnt.Http;
-using AnxiousAnt.ObjectPool;
+using AnxiousAnt.Text;
 
 namespace AnxiousAnt;
 

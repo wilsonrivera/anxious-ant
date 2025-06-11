@@ -16,5 +16,9 @@
     <PackageReference Include="Microsoft.Extensions.ObjectPool"/>
     <PackageReference Include="Unidecode.NET" PrivateAssets="compile" />
   </ItemGroup>
+  
+  <ItemGroup>
+    <None Include="build\AnxiousAnt.Abstractions.props" Pack="true" PackagePath="build\" />
+  </ItemGroup>
 
 </Project>

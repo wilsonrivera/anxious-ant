@@ -1,6 +1,6 @@
 using Microsoft.Extensions.ObjectPool;
 
-namespace AnxiousAnt.ObjectPool;
+namespace AnxiousAnt.Text;
 
 /// <summary>
 /// Provides a pool of <see cref="StringBuilder"/> instances for efficient reuse and reduced

@@ -1,7 +1,7 @@
 using System.Collections.Specialized;
 using System.Text.Json.Serialization;
 
-namespace AnxiousAnt.Json.Converters;
+namespace AnxiousAnt.Text.Json.Converters;
 
 public sealed class NameValueCollectionConverter : JsonConverter<NameValueCollection>
 {

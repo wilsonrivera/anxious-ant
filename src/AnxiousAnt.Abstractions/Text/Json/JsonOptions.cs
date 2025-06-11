@@ -1,6 +1,6 @@
 ﻿using System.Text.Json.Serialization;
 
-namespace AnxiousAnt.Json;
+namespace AnxiousAnt.Text.Json;
 
 /// <summary>
 /// Provides a centralized instance of <see cref="JsonSerializerOptions"/> that can be used throughout the application.

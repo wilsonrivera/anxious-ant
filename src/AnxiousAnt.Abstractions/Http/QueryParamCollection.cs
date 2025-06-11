@@ -5,7 +5,7 @@ using System.Diagnostics;
 using System.Text.RegularExpressions;
 
 using AnxiousAnt.Collections;
-using AnxiousAnt.ObjectPool;
+using AnxiousAnt.Text;
 
 namespace AnxiousAnt.Http;
 

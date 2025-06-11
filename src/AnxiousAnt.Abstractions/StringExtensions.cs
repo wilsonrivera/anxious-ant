@@ -2,7 +2,7 @@ using System.Runtime.InteropServices;
 using System.Text.Encodings.Web;
 using System.Text.Json.Serialization.Metadata;
 
-using AnxiousAnt.Json;
+using AnxiousAnt.Text.Json;
 
 namespace AnxiousAnt;
 

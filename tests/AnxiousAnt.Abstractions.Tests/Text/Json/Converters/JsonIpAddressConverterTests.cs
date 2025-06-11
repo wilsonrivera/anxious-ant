@@ -3,7 +3,7 @@ using System.Text.Json;
 
 using JsonSerializer = System.Text.Json.JsonSerializer;
 
-namespace AnxiousAnt.Json.Converters;
+namespace AnxiousAnt.Text.Json.Converters;
 
 public class JsonIpAddressConverterTests
 {

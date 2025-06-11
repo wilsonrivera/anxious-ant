@@ -1,7 +1,7 @@
 using System.Collections.Specialized;
 using System.Text.Json;
 
-namespace AnxiousAnt.Json.Converters;
+namespace AnxiousAnt.Text.Json.Converters;
 
 public class NameValueCollectionConverterTests
 {
