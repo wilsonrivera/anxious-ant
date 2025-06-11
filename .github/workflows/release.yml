@@ -55,9 +55,42 @@ jobs:
       - name: Run tests
         run: dotnet test --configuration Release
 
-  create-release:
+  pack:
     runs-on: ubuntu-latest
     needs: [test]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Get all history to allow automatic versioning using MinVer
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache ~/.nuget/packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: |
+            ${{ runner.os }}-nuget-${{ hashFiles('**/Directory.Packages.props', '**/Common.Build.props', '**/Directory.Build.props', '**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Create package
+        run: dotnet pack --configuration Release --output ${{ env.NUGET_DIRECTORY }} -p:CI=true
+
+      - name: Upload nuget files
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          if-no-files-found: error
+          retention-days: 7
+          path: ${{ env.NUGET_DIRECTORY }}
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [pack]
     outputs:
       Version: ${{ steps.nbgv.outputs.SimpleVersion }}
       TagExist: ${{ steps.tagged.outputs.TagExist }}
@@ -115,39 +148,6 @@ jobs:
             --title v${{ steps.nbgv.outputs.SimpleVersion }}
         env:
           GH_TOKEN: ${{ github.token }}
-
-  pack:
-    runs-on: ubuntu-latest
-    needs: [create-release]
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Get all history to allow automatic versioning using MinVer
-
-      - name: Setup dotnet
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: ${{ env.DOTNET_VERSION }}
-
-      - name: Cache ~/.nuget/packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.nuget/packages
-          key: |
-            ${{ runner.os }}-nuget-${{ hashFiles('**/Directory.Packages.props', '**/Common.Build.props', '**/Directory.Build.props', '**/*.csproj') }}
-          restore-keys: |
-            ${{ runner.os }}-nuget-
-
-      - name: Create package
-        run: dotnet pack --configuration Release --output ${{ env.NUGET_DIRECTORY }} -p:CI=true
-
-      - name: Upload nuget files
-        uses: actions/upload-artifact@v4
-        with:
-          name: packages
-          if-no-files-found: error
-          retention-days: 7
-          path: ${{ env.NUGET_DIRECTORY }}
 
   upload-artifacts:
     runs-on: ubuntu-latest
