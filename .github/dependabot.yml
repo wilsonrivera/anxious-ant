@@ -1,0 +1,11 @@
+version: 2
+updates:
+  - package-ecosystem: nuget
+    target-branch: develop
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    labels:
+      - "dependency management"
+    ignore:

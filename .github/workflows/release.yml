@@ -1,0 +1,199 @@
+name: Release
+on:
+  workflow_dispatch:
+    inputs:
+      versionIncrement:
+        description: 'Version increment.'
+        required: true
+        type: choice
+        default: 'build'
+        options:
+          - build
+          - minor
+          - major
+
+env:
+  CI: 1
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_NOLOGO: true
+  DOTNET_VERSION: 9.x
+  NUGET_DIRECTORY: ${{ github.workspace}}/packages
+
+concurrency:
+  group: Release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Get all history to allow automatic versioning using MinVer
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache ~/.nuget/packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: |
+            ${{ runner.os }}-nuget-${{ hashFiles('**/Directory.Packages.props', '**/Common.Build.props', '**/Directory.Build.props', '**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Run tests
+        run: dotnet test --configuration Release
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [test]
+    outputs:
+      Version: ${{ steps.nbgv.outputs.SimpleVersion }}
+      TagExist: ${{ steps.tagged.outputs.TagExist }}
+      NextVersion: ${{ steps.prepare-release.outputs.NextVersion }}
+      NextTagExist: ${{ steps.prepare-release.outputs.NextTagExist }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
+
+      - id: nbgv
+        name: Setup NBGV
+        uses: dotnet/nbgv@master
+
+      - name: Set version
+        run: nbgv cloud
+
+      - id: tagged
+        name: Check if tag exists
+        run: |
+          git show-ref --tags --verify --quiet -- \
+            "refs/tags/v${{ steps.nbgv.outputs.SimpleVersion }}" && \
+            echo "TagExist=1 >> $GITHUB_OUTPUT" || echo "TagExist=0 >> $GITHUB_OUTPUT"
+
+      - id: prepare-release
+        name: Prepare release
+        run: |
+          # Configure Github user
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          
+          branch=${GITHUB_HEAD_REF:-${GITHUB_REF#refs/heads/}}
+          
+          nbgv prepare-release \
+            --versionIncrement ${{ github.event.inputs.versionIncrement }} \
+            --commit-message-pattern "chore: update version to '{0}' [skip ci]"
+          
+          nextVersion="$(nbgv get-version -f json | jq -r '.SimpleVersion')"
+          git show-ref --tags --verify --quiet -- "refs/tags/v$nextVersion" && \
+            echo "NextTagExist=1 >> $GITHUB_OUTPUT" || echo "NextTagExist=0 >> $GITHUB_OUTPUT"
+          
+          echo "NextVersion=$nextVersion >> $GITHUB_OUTPUT"
+
+      - name: Update version
+        if: steps.prepare-release.outputs.NextTagExist == 0
+        run: |
+          git push
+
+      - id: release
+        name: Create release
+        run: |
+          gh release create v${{ steps.nbgv.outputs.SimpleVersion }} --generate-notes \
+            --title v${{ steps.nbgv.outputs.SimpleVersion }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  pack:
+    runs-on: ubuntu-latest
+    needs: [create-release]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Get all history to allow automatic versioning using MinVer
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache ~/.nuget/packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: |
+            ${{ runner.os }}-nuget-${{ hashFiles('**/Directory.Packages.props', '**/Common.Build.props', '**/Directory.Build.props', '**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Create package
+        run: dotnet pack --configuration Release --output ${{ env.NUGET_DIRECTORY }} -p:CI=true
+
+      - name: Upload nuget files
+        uses: actions/upload-artifact@v4
+        with:
+          name: packages
+          if-no-files-found: error
+          retention-days: 7
+          path: ${{ env.NUGET_DIRECTORY }}
+
+  upload-artifacts:
+    runs-on: ubuntu-latest
+    needs: [create-release, pack]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Get all history to allow automatic versioning using MinVer
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: ${{ env.NUGET_DIRECTORY }}
+
+      - name: Upload release artifacts
+        shell: pwsh
+        run: |
+          foreach($file in (Get-ChildItem "${{ env.NUGET_DIRECTORY }}" -Recurse -Include *.nupkg)) {
+            gh release upload v${{ needs.create-release.outputs.Version }} $file
+          }
+          
+          foreach($file in (Get-ChildItem "${{ env.NUGET_DIRECTORY }}" -Recurse -Include *.snupkg)) {
+            gh release upload v${{ needs.create-release.outputs.Version }} $file
+          }
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: [pack]
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: packages
+          path: ${{ env.NUGET_DIRECTORY }}
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Setup dotnet
+        shell: pwsh
+        run: |
+          foreach($file in (Get-ChildItem "${{ env.NUGET_DIRECTORY }}" -Recurse -Include *.nupkg)) {
+              dotnet nuget push $file --api-key "${{ secrets.NUGET_APIKEY }}" --source https://api.nuget.org/v3/index.json --skip-duplicate
+          }

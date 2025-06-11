@@ -1,0 +1,83 @@
+name: Run tests
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - 'main'
+    paths:
+      - nuget.config
+      - Common.Build.props
+      - Directory.Packages.props
+      - 'src/**/*'
+      - 'tests/**/*'
+      - '.config/*'
+  pull_request:
+    branches:
+      - '*'          # Run the workflow for all pull requests
+
+env:
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
+  DOTNET_NOLOGO: true
+  DOTNET_VERSION: 9.x
+  RESULTS_DIRECTORY: ${{ github.workspace}}/test_results
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+defaults:
+  run:
+    shell: bash
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Get all history to allow automatic versioning using MinVer
+
+      - name: Setup dotnet
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Cache ~/.nuget/packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: |
+            ${{ runner.os }}-nuget-${{ hashFiles('**/Directory.Packages.props', '**/Common.Build.props', '**/Directory.Build.props', '**/*.csproj') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Install tools
+        run: dotnet tool restore
+
+      - name: Run tests
+        run: |
+          dotnet test --configuration Release \
+            --logger html \
+            --results-directory ${{ env.RESULTS_DIRECTORY }} \
+            --collect:"XPlat Code Coverage"
+
+      - name: Generate coverage report
+        if: ${{ hashFiles(env.RESULTS_DIRECTORY) != '' }}
+        run: |
+          dotnet reportgenerator \
+            -reports:"${{ env.RESULTS_DIRECTORY }}/*/coverage.cobertura.xml" \
+            -targetdir:"${{ env.RESULTS_DIRECTORY }}/report" \
+            -reporttypes:"Html_Dark;Cobertura;MarkdownSummaryGithub" \
+            -filefilters:"-*.g.cs" \
+            -tag:"${{ github.run_number }}_${{ github.run_id }}"
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          if-no-files-found: warn
+          retention-days: 7
+          path: ${{ env.RESULTS_DIRECTORY }}

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="Current" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <LangVersion>13</LangVersion>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <DebugType>portable</DebugType>
+    <NeutralLanguage>en-US</NeutralLanguage>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <NoWarn>NU1903</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(CI)' == 'true' ">
+    <ContinuousIntegrationBuild>true</ContinuousIntegrationBuild>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Windows)))' ">
+    <IsWindows>true</IsWindows>
+    <DefineConstants>$(DefineConstants);WINDOWS_OS</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::Linux)))' ">
+    <IsLinux>true</IsLinux>
+    <DefineConstants>$(DefineConstants);LINUX_OS</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$([System.Runtime.InteropServices.RuntimeInformation]::IsOSPlatform($([System.Runtime.InteropServices.OSPlatform]::OSX)))' ">
+    <IsMacOS>true</IsMacOS>
+    <DefineConstants>$(DefineConstants);OSX_OS</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Using Include="System.Buffers"/>
+    <Using Include="System.Text"/>
+    <Using Include="System.Collections.Immutable"/>
+    <Using Include="System.Diagnostics.CodeAnalysis"/>
+    <Using Include="System.Diagnostics.Contracts"/>
+    <Using Include="System.Runtime.CompilerServices"/>
+  </ItemGroup>
+</Project>

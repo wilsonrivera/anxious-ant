@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "isRoot": true,
+  "tools": {
+    "nbgv": {
+      "version": "3.7.115",
+      "commands": [
+        "nbgv"
+      ],
+      "rollForward": false
+    },
+    "dotnet-reportgenerator-globaltool": {
+      "version": "5.4.7",
+      "commands": [
+        "reportgenerator"
+      ],
+      "rollForward": false
+    },
+    "dotnet-validate": {
+      "version": "0.0.1-preview.537",
+      "commands": [
+        "dotnet-validate"
+      ],
+      "rollForward": false
+    }
+  }
+}
