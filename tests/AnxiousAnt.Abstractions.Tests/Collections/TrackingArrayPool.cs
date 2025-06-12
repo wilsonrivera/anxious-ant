@@ -4,8 +4,6 @@ internal sealed class TrackingArrayPool<T> : ArrayPool<T>
 {
     private readonly List<T[]> _rentedArrays = [];
 
-    public static TrackingArrayPool<T> Instance { get; } = new();
-
     public int Count => _rentedArrays.Count;
 
     /// <inheritdoc />

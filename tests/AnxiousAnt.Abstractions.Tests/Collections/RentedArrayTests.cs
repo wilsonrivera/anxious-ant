@@ -6,51 +6,58 @@ public class RentedArrayTests
     public void Uninitialized_ShouldNotHaveAnyElement()
     {
         // Arrange
-        RentedArray<int> array = default;
-        Action act = () => { _ = array.ArraySegment; };
+        RentedArray<int> rentedArray = default;
 
         // Assert
-        array.Length.ShouldBe(0);
-        array.Array.ShouldBeNull();
-        array.Span.Length.ShouldBe(0);
-        array.Memory.Length.ShouldBe(0);
-        act.ShouldThrow<ArgumentNullException>();
+        rentedArray.Length.ShouldBe(0);
+        rentedArray.GetArray().ShouldBeNull();
+        rentedArray.Span.Length.ShouldBe(0);
+        rentedArray.Memory.Length.ShouldBe(0);
     }
 
     [Fact]
     public void DefaultCtor_ShouldNotHaveAnyElement()
     {
         // Arrange
-        RentedArray<int> array = new();
-        Action act = () => { _ = array.ArraySegment; };
+        RentedArray<int> rentedArray = new();
 
         // Assert
-        array.Length.ShouldBe(0);
-        array.Array.ShouldBeNull();
-        array.Span.Length.ShouldBe(0);
-        array.Memory.Length.ShouldBe(0);
-        act.ShouldThrow<ArgumentNullException>();
+        rentedArray.Length.ShouldBe(0);
+        rentedArray.GetArray().ShouldBeNull();
+        rentedArray.Span.Length.ShouldBe(0);
+        rentedArray.Memory.Length.ShouldBe(0);
     }
 
     [Fact]
     public void This_ShouldThrowWhenGivenNegativeIndex()
     {
         // Arrange
-        RentedArray<int> array = new();
-        Action act = () => { _ = array[-1]; };
+        RentedArray<int> rentedArray = new();
+        Action act = () => { _ = rentedArray[-1]; };
 
         // Assert
-        act.ShouldThrow<ArgumentOutOfRangeException>();
+        act.ShouldThrow<IndexOutOfRangeException>();
     }
 
     [Fact]
     public void This_ShouldThrowWhenGivenIndexGreaterThanLength()
     {
         // Arrange
-        RentedArray<int> array = RentedArray<int>.FromArray([3]);
+        RentedArray<int> rentedArray = RentedArray<int>.FromArray([1]);
+        Action act = () => { _ = rentedArray[1]; };
 
         // Assert
-        array[0].ShouldBe(3);
+        act.ShouldThrow<IndexOutOfRangeException>();
+    }
+
+    [Fact]
+    public void This_ShouldReturnElementAtIndex()
+    {
+        // Arrange
+        RentedArray<int> rentedArray = RentedArray<int>.FromArray([3]);
+
+        // Assert
+        rentedArray[0].ShouldBe(3);
     }
 
     [Fact]
@@ -67,79 +74,32 @@ public class RentedArrayTests
     public void FromArray_ShouldReturnEmptyWhenGivenEmptyArray()
     {
         // Act
-        var array = RentedArray<int>.FromArray([]);
+        var rentedArray = RentedArray<int>.FromArray([]);
 
         // Assert
-        array.Array.ShouldBeSameAs(RentedArray<int>.Empty.Array);
-    }
-
-    [Fact]
-    public void FromArray_ShouldNotRentWhenGivenEmptyArray()
-    {
-        // Act
-        var countBefore = TrackingArrayPool<int>.Instance.Count;
-        var array = RentedArray<int>.FromArray(TrackingArrayPool<int>.Instance, []);
-
-        // Assert
-        TrackingArrayPool<int>.Instance.Count.ShouldBe(countBefore);
-        array.Array.ShouldBeSameAs(RentedArray<int>.Empty.Array);
-    }
-
-    [Fact]
-    public void FromArray_ShouldCopyGivenArray()
-    {
-        // Arrange
-        var arr = new[] { 1, 2, 3 };
-
-        // Act
-        var rented = RentedArray<int>.FromArray(arr);
-        arr[0] = 4;
-
-        // Assert
-        rented.Length.ShouldBe(3);
-        rented.Array[..3].ShouldBe([1, 2, 3]);
-    }
-
-    [Fact]
-    public void FromArray_ShouldReturnRentedArray()
-    {
-        // Arrange
-        var arr = new[] { 1, 2, 3 };
-        var countBefore = TrackingArrayPool<int>.Instance.Count;
-
-        // Act
-        var rented = RentedArray<int>.FromArray(TrackingArrayPool<int>.Instance, arr);
-        arr[0] = 4;
-
-        // Assert
-        TrackingArrayPool<int>.Instance.Count.ShouldBe(countBefore + 1);
-        rented.Length.ShouldBe(3);
-        rented.Array[..3].ShouldBe([1, 2, 3]);
-        rented.Dispose();
-
-        TrackingArrayPool<int>.Instance.Count.ShouldBe(countBefore);
+        rentedArray.GetArray().ShouldBeSameAs(RentedArray<int>.Empty.GetArray());
     }
 
     [Fact]
     public void FromSpan_ShouldReturnEmptyWhenGivenEmptyArray()
     {
         // Act
-        var array = RentedArray<int>.FromSpan([]);
+        var rentedArray = RentedArray<int>.FromSpan([]);
 
         // Assert
-        array.Array.ShouldBeSameAs(RentedArray<int>.Empty.Array);
+        rentedArray.GetArray().ShouldBeSameAs(RentedArray<int>.Empty.GetArray());
     }
 
     [Fact]
     public void FromSpan_ShouldNotRentWhenGivenEmptyArray()
     {
         // Act
-        var countBefore = TrackingArrayPool<int>.Instance.Count;
-        var array = RentedArray<int>.FromSpan(TrackingArrayPool<int>.Instance, []);
+        var pool = new TrackingArrayPool<int>();
+        var rentedArray = RentedArray<int>.FromSpan(pool, []);
 
         // Assert
-        TrackingArrayPool<int>.Instance.Count.ShouldBe(countBefore);
-        array.Array.ShouldBeSameAs(RentedArray<int>.Empty.Array);
+        pool.Count.ShouldBe(0);
+        rentedArray.GetArray().ShouldBeSameAs(RentedArray<int>.Empty.GetArray());
     }
 
     [Fact]
@@ -149,12 +109,12 @@ public class RentedArrayTests
         var arr = new[] { 1, 2, 3 };
 
         // Act
-        var rented = RentedArray<int>.FromSpan(arr);
+        var rentedArray = RentedArray<int>.FromSpan(arr);
         arr[0] = 4;
 
         // Assert
-        rented.Length.ShouldBe(3);
-        rented.Array[..3].ShouldBe([1, 2, 3]);
+        rentedArray.Length.ShouldBe(3);
+        rentedArray.GetArray()![..3].ShouldBe([1, 2, 3]);
     }
 
     [Fact]
@@ -162,29 +122,90 @@ public class RentedArrayTests
     {
         // Arrange
         var arr = new[] { 1, 2, 3 };
-        var countBefore = TrackingArrayPool<int>.Instance.Count;
+        var pool = new TrackingArrayPool<int>();
 
         // Act
-        var rented = RentedArray<int>.FromSpan(TrackingArrayPool<int>.Instance, arr);
+        var rentedArray = RentedArray<int>.FromSpan(pool, arr);
         arr[0] = 4;
 
         // Assert
-        TrackingArrayPool<int>.Instance.Count.ShouldBe(countBefore + 1);
-        rented.Length.ShouldBe(3);
-        rented.Array[..3].ShouldBe([1, 2, 3]);
-        rented.Dispose();
+        pool.Count.ShouldBe(1);
+        rentedArray.Length.ShouldBe(3);
+        rentedArray.ToArray().ShouldBe([1, 2, 3]);
+        rentedArray.Dispose();
 
-        TrackingArrayPool<int>.Instance.Count.ShouldBe(countBefore);
+        pool.Count.ShouldBe(0);
     }
 
     [Fact]
-    public void GetEnumerator_ShouldReturnEmptyEnumeratorForUninitializedList()
+    public void Dispose_Uninitialized_ShouldNotThrow()
     {
         // Arrange
-        RentedArray<int> list = RentedArray<int>.Empty;
+        RentedArray<int> rentedArray = default;
 
         // Act
-        using var enumerator = list.GetEnumerator();
+        rentedArray.Dispose();
+    }
+
+    [Fact]
+    public void Dispose_DefaultCtor_ShouldNotThrow()
+    {
+        // Arrange
+        RentedArray<int> rentedArray = new();
+
+        // Act
+        rentedArray.Dispose();
+    }
+
+    [Fact]
+    public void Dispose_ShouldNotThrowWhenRentedArrayIsDisposed()
+    {
+        // Arrange
+        var rentedArray = RentedArray<int>.FromArray([1, 2, 3]);
+
+        // Act
+        rentedArray.Dispose();
+        rentedArray.Dispose();
+    }
+
+    [Fact]
+    public void Dispose_ShouldClearArrayWhenTypeIsReferenceType()
+    {
+        // Arrange
+        var rentedArray = RentedArray<string>.FromArray(["1", "2", "3"]);
+        var array = rentedArray.GetArray()!;
+
+        // Act
+        rentedArray.Dispose();
+
+        // Assert
+        rentedArray.GetArray().ShouldBeNull();
+        array[0].ShouldBeNull();
+        array[1].ShouldBeNull();
+        array[2].ShouldBeNull();
+    }
+
+    [Fact]
+    public void GetEnumerator_Uninitialized_ShouldReturnEmptyEnumerator()
+    {
+        // Arrange
+        RentedArray<int> rentedArray = default;
+
+        // Act
+        var enumerator = rentedArray.GetEnumerator();
+
+        // Assert
+        enumerator.MoveNext().ShouldBeFalse();
+    }
+
+    [Fact]
+    public void GetEnumerator_DefaultCtor_ShouldReturnEmptyEnumerator()
+    {
+        // Arrange
+        RentedArray<int> rentedArray = new();
+
+        // Act
+        var enumerator = rentedArray.GetEnumerator();
 
         // Assert
         enumerator.MoveNext().ShouldBeFalse();
@@ -194,60 +215,104 @@ public class RentedArrayTests
     public void GetEnumerator_ShouldReturnEmptyEnumeratorForListWithNoElements()
     {
         // Arrange
-        RentedArray<int> list = RentedArray<int>.Empty;
+        RentedArray<int> rentedArray = RentedArray<int>.Empty;
 
         // Act
-        using var enumerator = list.GetEnumerator();
+        var enumerator = rentedArray.GetEnumerator();
 
         // Assert
         enumerator.MoveNext().ShouldBeFalse();
     }
 
     [Fact]
-    public void Dispose_ShouldNotThrowWhenRentedArrayIsUninitialized()
+    public void GetArray_Uninitialized_ShouldReturnNull()
     {
         // Arrange
-        RentedArray<int> array = default;
-
-        // Act
-        array.Dispose();
-    }
-
-    [Fact]
-    public void Dispose_ShouldNotThrowWhenRentedArrayIsEmpty()
-    {
-        // Arrange
-        RentedArray<int> array = new();
-
-        // Act
-        array.Dispose();
-    }
-
-    [Fact]
-    public void Dispose_ShouldNotThrowWhenRentedArrayIsDisposed()
-    {
-        // Arrange
-        var array = RentedArray<int>.FromArray([1, 2, 3]);
-
-        // Act
-        array.Dispose();
-        array.Dispose();
-    }
-
-    [Fact]
-    public void Dispose_ShouldClearArrayWhenTypeIsReferenceType()
-    {
-        // Arrange
-        var rented = RentedArray<string>.FromArray(["1", "2", "3"]);
-        var array = rented.Array;
-
-        // Act
-        rented.Dispose();
+        RentedArray<int> rentedArray = default;
 
         // Assert
-        rented.Array.ShouldBeNull();
-        array[0].ShouldBeNull();
-        array[1].ShouldBeNull();
-        array[2].ShouldBeNull();
+        rentedArray.GetArray().ShouldBeNull();
+    }
+
+    [Fact]
+    public void GetArray_DefaultCtor_ShouldReturnNull()
+    {
+        // Arrange
+        RentedArray<int> rentedArray = new();
+
+        // Assert
+        rentedArray.GetArray().ShouldBeNull();
+    }
+
+    [Fact]
+    public void GetArray_ShouldReturnUnderlyingArray()
+    {
+        // Arrange
+        var rentedArray = RentedArray<int>.FromArray([1, 2, 3]);
+
+        // Act
+        var array = rentedArray.GetArray()!;
+
+        // Assert
+        array[..3].ShouldBe([1, 2, 3]);
+        array.ShouldBeSameAs(rentedArray.GetArray());
+    }
+
+    [Fact]
+    public void ToArray_Uninitialized_ShouldReturnEmptyArray()
+    {
+        // Arrange
+        RentedArray<int> rentedArray = default;
+
+        // Act
+        var array = rentedArray.ToArray();
+
+        // Assert
+        array.ShouldBeEmpty();
+        array.ShouldBeSameAs(RentedArray<int>.Empty.GetArray());
+    }
+
+    [Fact]
+    public void ToArray_DefaultCtor_ShouldReturnEmptyArray()
+    {
+        // Arrange
+        RentedArray<int> rentedArray = default;
+
+        // Act
+        var array = rentedArray.ToArray();
+
+        // Assert
+        array.ShouldBeEmpty();
+        array.ShouldBeSameAs(RentedArray<int>.Empty.GetArray());
+    }
+
+    [Fact]
+    public void ToArray_ShouldReturnArrayWithSameElements()
+    {
+        // Arrange
+        var rentedArray = RentedArray<int>.FromArray([1, 2, 3]);
+
+        // Act
+        var array = rentedArray.ToArray();
+
+        // Assert
+        array.ShouldBe([1, 2, 3]);
+    }
+
+    [Fact]
+    public void Enumerator_SmokeTest()
+    {
+        // Arrange
+        var rentedArray = RentedArray<int>.FromArray([1, 2, 3]);
+        var result = new List<int>();
+
+        // Act
+        foreach (var item in rentedArray)
+        {
+            result.Add(item);
+        }
+
+        // Assert
+        result.ShouldBe([1, 2, 3]);
     }
 }

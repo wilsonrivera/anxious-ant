@@ -425,9 +425,8 @@ public class PooledListTests
     public void ShouldNeverOwnMoreThanOneRentedArray()
     {
         // Arrange
-        _ = TrackingArrayPool<int>.Instance.Rent(4);
-        var countBefore = TrackingArrayPool<int>.Instance.Count;
-        PooledList<int> list = new(TrackingArrayPool<int>.Instance);
+        var pool = new TrackingArrayPool<int>();
+        PooledList<int> list = new(pool);
 
         // Act
         for (var i = 0; i < 100; i++)
@@ -436,8 +435,8 @@ public class PooledListTests
         }
 
         // Assert
-        TrackingArrayPool<int>.Instance.Count.ShouldBe(countBefore + 1);
+        pool.Count.ShouldBe(1);
         list.Dispose();
-        TrackingArrayPool<int>.Instance.Count.ShouldBe(countBefore);
+        pool.Count.ShouldBe(0);
     }
 }

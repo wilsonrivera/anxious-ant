@@ -1,4 +1,3 @@
-using System.Collections;
 using System.Diagnostics;
 
 namespace AnxiousAnt.Collections;
@@ -9,20 +8,11 @@ namespace AnxiousAnt.Collections;
 /// </summary>
 /// <typeparam name="T">The type of elements in the pooled array.</typeparam>
 [DebuggerDisplay("Length = {Length}")]
-public struct RentedArray<T> : IEnumerable<T>, IDisposable
+public struct RentedArray<T> : IDisposable
 {
     private T[]? _arrayFromPool;
-    [DebuggerBrowsable(DebuggerBrowsableState.Never)] private readonly bool _isEmpty;
     private readonly ArrayPool<T> _pool;
     private readonly int _length;
-
-    private RentedArray(bool empty)
-    {
-        _isEmpty = empty;
-        _arrayFromPool = [];
-        _pool = ArrayPool<T>.Shared;
-        _length = 0;
-    }
 
     private RentedArray(ArrayPool<T> pool, T[] array, int length)
     {
@@ -34,7 +24,7 @@ public struct RentedArray<T> : IEnumerable<T>, IDisposable
     /// <summary>
     /// Gets an empty instance of <see cref="RentedArray{T}"/>.
     /// </summary>
-    public static RentedArray<T> Empty { get; } = new(true);
+    public static RentedArray<T> Empty { get; } = new(ArrayPool<T>.Shared, [], 0);
 
     /// <summary>
     /// Gets the number of elements stored in the <see cref="RentedArray{T}"/>.
@@ -58,18 +48,11 @@ public struct RentedArray<T> : IEnumerable<T>, IDisposable
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get
         {
-            var span = _arrayFromPool.AsSpan();
-            ArgumentOutOfRangeException.ThrowIfNegative(index);
-
+            var span = _arrayFromPool.AsSpan(0, _length);
             ref var local = ref span[index];
             return ref local!;
         }
     }
-
-    /// <summary>
-    /// Gets the underlying array allocated from the pool, which backs the <see cref="RentedArray{T}"/>.
-    /// </summary>
-    public T[] Array => _arrayFromPool!;
 
     /// <summary>
     /// Gets a span representing the contiguous region of memory currently in use
@@ -83,25 +66,9 @@ public struct RentedArray<T> : IEnumerable<T>, IDisposable
     /// <summary>
     /// Gets a <see cref="Memory{T}"/> representing the current elements of the <see cref="RentedArray{T}"/>.
     /// </summary>
-    /// <remarks>
-    /// The returned <see cref="Memory{T}"/> will span only the used portion of the underlying array.
-    /// If the array is uninitialized or contains no elements, the returned memory will be empty.
-    /// </remarks>
     public Memory<T> Memory
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)] get => _arrayFromPool.AsMemory(0, _length);
-    }
-
-    /// <summary>
-    /// Gets an <see cref="ArraySegment{T}"/> representing the current elements of the <see cref="RentedArray{T}"/>.
-    /// </summary>
-    /// <remarks>
-    /// The returned <see cref="ArraySegment{T}"/> provides access to the underlying memory for the elements
-    /// currently stored in the array, starting at index 0 and with a count equal to the number of active elements.
-    /// </remarks>
-    public ArraySegment<T> ArraySegment
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)] get => new(_arrayFromPool!, 0, _length);
     }
 
     /// <summary>
@@ -113,30 +80,37 @@ public struct RentedArray<T> : IEnumerable<T>, IDisposable
     /// A <see cref="RentedArray{T}"/> instance containing the elements of the provided array.
     /// </returns>
     [ExcludeFromCodeCoverage]
-    public static RentedArray<T> FromArray(T[] array) =>
-        FromArray(ArrayPool<T>.Shared, array);
+    public static RentedArray<T> FromArray(T[] array)
+    {
+        ArgumentNullException.ThrowIfNull(array);
+        return FromSpan(ArrayPool<T>.Shared, array.AsSpan());
+    }
 
     /// <summary>
     /// Creates a new instance of <see cref="RentedArray{T}"/> from the given span,
     /// acquiring the span's content for internal use.
     /// </summary>
-    /// <param name="span">The source span to create the <see cref="RentedArray{T}"/> instance from.</param>
+    /// <param name="source">The source span to create the <see cref="RentedArray{T}"/> instance from.</param>
     /// <returns>
     /// A <see cref="RentedArray{T}"/> instance containing the elements of the provided span.
     /// </returns>
     [ExcludeFromCodeCoverage]
-    public static RentedArray<T> FromSpan(Span<T> span) =>
-        FromSpan(ArrayPool<T>.Shared, span);
+    public static RentedArray<T> FromSpan(in Span<T> source) =>
+        FromSpan(ArrayPool<T>.Shared, source);
 
-    internal static RentedArray<T> FromArray(ArrayPool<T> pool, T[] array)
-    {
-        ArgumentNullException.ThrowIfNull(pool);
-        ArgumentNullException.ThrowIfNull(array);
+    /// <summary>
+    /// Creates a new instance of <see cref="RentedArray{T}"/> from the given span,
+    /// acquiring the span's content for internal use.
+    /// </summary>
+    /// <param name="source">The source span to create the <see cref="RentedArray{T}"/> instance from.</param>
+    /// <returns>
+    /// A <see cref="RentedArray{T}"/> instance containing the elements of the provided span.
+    /// </returns>
+    [ExcludeFromCodeCoverage]
+    public static RentedArray<T> FromSpan(in ReadOnlySpan<T> source) =>
+        FromSpan(ArrayPool<T>.Shared, source);
 
-        return FromSpan(pool, array.AsSpan());
-    }
-
-    internal static RentedArray<T> FromSpan(ArrayPool<T> pool, Span<T> source)
+    internal static RentedArray<T> FromSpan(ArrayPool<T> pool, in ReadOnlySpan<T> source)
     {
         ArgumentNullException.ThrowIfNull(pool);
         if (source.Length == 0)
@@ -152,18 +126,11 @@ public struct RentedArray<T> : IEnumerable<T>, IDisposable
     }
 
     /// <inheritdoc />
-    public IEnumerator<T> GetEnumerator() => ArraySegment.GetEnumerator();
-
-    /// <inheritdoc />
-    [ExcludeFromCodeCoverage]
-    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
-
-    /// <inheritdoc />
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public void Dispose()
     {
         T[]? toReturn = _arrayFromPool;
-        if (toReturn is null || _isEmpty)
+        if (toReturn is null || toReturn.Length == 0)
         {
             return;
         }
@@ -179,23 +146,73 @@ public struct RentedArray<T> : IEnumerable<T>, IDisposable
     }
 
     /// <summary>
-    /// Returns a reference to the 0th element of the array.
+    /// Returns an enumerator that iterates through the elements of the <see cref="RentedArray{T}"/>.
     /// </summary>
     /// <returns>
-    /// A reference to the 0th element of the array.
+    /// An enumerator for the <see cref="RentedArray{T}"/>, allowing iteration over its elements.
     /// </returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public ref T GetPinnableReference()
-    {
-        // Ensure that the native code has just one forward branch that is predicted-not-taken.
-        ref T ret = ref Unsafe.NullRef<T>();
-        ref var array = ref _arrayFromPool;
+    public Enumerator GetEnumerator() => new(this);
 
-        if (_length > 0 && array is not null)
+    /// <summary>
+    /// Retrieves the underlying array used by the <see cref="RentedArray{T}"/> instance.
+    /// </summary>
+    /// <returns>
+    /// The array backing this <see cref="RentedArray{T}"/> instance.
+    /// </returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public T[]? GetArray() => _arrayFromPool;
+
+    /// <summary>
+    /// Converts the rented array into a new regular array, copying the elements to it.
+    /// </summary>
+    /// <returns>
+    /// A new array of type <typeparamref name="T"/> containing all the elements from the current
+    /// <see cref="RentedArray{T}"/>.
+    /// </returns>
+    public T[] ToArray()
+    {
+        var length = _length;
+        var arrayFromPool = _arrayFromPool;
+        if (length == 0)
         {
-            ret = ref array[0];
+            return [];
         }
 
-        return ref ret;
+        var arr = new T[length];
+        Array.Copy(arrayFromPool!, 0, arr, 0, length);
+        return arr;
+    }
+
+    /// <summary>
+    /// Provides an enumerator structure for iterating over the elements of a <see cref="RentedArray{T}"/>.
+    /// </summary>
+    public ref struct Enumerator(RentedArray<T> rentedArray)
+    {
+        private int _index;
+        private readonly int _length = rentedArray._length;
+
+        /// <summary>
+        /// Gets the current element during iteration.
+        /// </summary>
+        public T Current { get; private set; } = default!;
+
+        /// <summary>
+        /// Advances the enumerator to the next element of the <see cref="RentedArray{T}"/>.
+        /// </summary>
+        /// <returns>
+        /// <c>true</c> if the enumerator was successfully advanced to the next element; otherwise, <c>false</c>.
+        /// </returns>
+        public bool MoveNext()
+        {
+            var length = _length;
+            if (length == 0 || _index >= length)
+            {
+                return false;
+            }
+
+            Current = rentedArray[_index++];
+            return true;
+        }
     }
 }

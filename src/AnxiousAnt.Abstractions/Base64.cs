@@ -77,33 +77,40 @@ public static class Base64
     }
 
     /// <summary>
-    /// Calculates the maximum length of the byte array that can be obtained by decoding a base64
-    /// string of the specified length.
+    /// Calculates the maximum possible length of decoded data from a Base64-encoded string.
     /// </summary>
-    /// <param name="length">The length of the base64 string.</param>
+    /// <param name="s">The Base64-encoded input string to evaluate. Must not be <c>null</c>.</param>
     /// <returns>
-    /// The maximum length of the byte array that can be obtained by decoding the input base64 string.
+    /// The maximum length of the decoded data in bytes.
     /// </returns>
+    /// <exception cref="ArgumentNullException">Thrown when the input string <paramref name="s"/> is <c>null</c>.</exception>
+    [ExcludeFromCodeCoverage]
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static int GetMaxDecodeLength(int length)
+    public static int GetMaxDecodeLength(string? s)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(length);
-        return ThirdParty.LitJWT.Base64.GetMaxBase64DecodeLength(length);
+        ArgumentNullException.ThrowIfNull(s);
+        return GetMaxDecodeLength(s.AsSpan());
     }
 
     /// <summary>
-    /// Calculates the maximum number of bytes required to decode a URL-safe Base64-encoded string of
-    /// the specified length.
+    /// Computes the maximum possible length of decoded bytes for a given Base64 or URL-safe Base64 encoded input.
     /// </summary>
-    /// <param name="length">The length of the URL-safe Base64-encoded string.</param>
+    /// <param name="s">The read-only span of characters representing the encoded input to evaluate.</param>
     /// <returns>
-    /// The maximum number of bytes required to decode the URL-safe Base64-encoded string.
+    /// The maximum number of bytes that the decoded output might contain.
     /// </returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static int GetMaxUrlSafeDecodeLength(int length)
+    public static int GetMaxDecodeLength(in ReadOnlySpan<char> s)
     {
-        ArgumentOutOfRangeException.ThrowIfNegative(length);
-        return ThirdParty.LitJWT.Base64.GetMaxBase64UrlDecodeLength(length);
+        if (s.IsWhiteSpace())
+        {
+            return 0;
+        }
+
+        var isUrlSafe = IsUrlSafeBase64(s);
+        return isUrlSafe
+            ? ThirdParty.LitJWT.Base64.GetMaxBase64UrlDecodeLength(s.Length)
+            : ThirdParty.LitJWT.Base64.GetMaxBase64DecodeLength(s.Length);
     }
 
     /// <summary>
@@ -277,38 +284,36 @@ public static class Base64
     }
 
     /// <summary>
-    /// Attempts to decode a Base64-encoded or URL-safe Base64-encoded string into a binary array.
+    /// Attempts to decode a Base64-encoded string into a sequence of bytes and writes the result to the provided destination buffer.
     /// </summary>
-    /// <param name="str">The Base64-encoded or URL-safe Base64-encoded string to decode.</param>
-    /// <param name="result">
-    /// When this method returns, contains the decoded byte array if the operation succeeded;
-    /// otherwise, contains the default value of <see cref="RentedArray{T}"/>. This parameter is passed uninitialized.
-    /// </param>
+    /// <param name="str">The Base64-encoded string to decode. Can be null or empty.</param>
+    /// <param name="destination">A span of bytes where the decoded data will be written.</param>
+    /// <param name="bytesWritten">The number of bytes written to the destination span.</param>
     /// <returns>
-    /// <c>true</c> if the string was successfully decoded into a byte array; otherwise, <c>false</c>.
+    /// <c>true</c> if the string was successfully decoded; otherwise, <c>false</c>.
     /// </returns>
     [ExcludeFromCodeCoverage]
-    public static bool TryFromString(string? str, out RentedArray<byte> result)
+    public static bool TryFromString(string? str, Span<byte> destination, out int bytesWritten)
     {
-        result = default;
-        return !string.IsNullOrWhiteSpace(str) && TryFromChars(str.AsSpan(), out result);
+        bytesWritten = 0;
+        return !string.IsNullOrWhiteSpace(str) && TryFromChars(str.AsSpan(), destination, out bytesWritten);
     }
 
     /// <summary>
-    /// Attempts to decode a Base64-encoded or URL-safe Base64-encoded string into a binary array.
+    /// Attempts to decode a Base64 or URL-safe Base64 encoded string represented as a read-only span of characters
+    /// into a byte span.
     /// </summary>
-    /// <param name="s">The read-only span of Base64-encoded or URL-safe Base64 characters to decode.</param>
-    /// <param name="result">
-    /// When this method returns, contains a <see cref="RentedArray{T}"/> containing the decoded binary data if the
-    /// decoding is successful, or an uninitialized <see cref="RentedArray{T}"/> if the decoding fails.
-    /// </param>
+    /// <param name="s">The input read-only span of characters to decode.</param>
+    /// <param name="destination">The span where the decoded bytes will be written.</param>
+    /// <param name="bytesWritten">When this method returns, contains the number of bytes written into the
+    /// destination span.</param>
     /// <returns>
-    /// <c>true</c> if the string is successfully decoded; otherwise, <c>false</c>.
+    /// <c>true</c> if the decoding was successful; otherwise, <c>false</c>.
     /// </returns>
-    public static bool TryFromChars(in ReadOnlySpan<char> s, out RentedArray<byte> result)
+    public static bool TryFromChars(in ReadOnlySpan<char> s, Span<byte> destination, out int bytesWritten)
     {
-        result = default;
-        if (s.IsEmpty)
+        bytesWritten = 0;
+        if (s.IsWhiteSpace())
         {
             return false;
         }
@@ -319,12 +324,12 @@ public static class Base64
         {
             case false when !IsBase64(s):
                 return false;
-            case false when s.Length % 4 != 0:
+            case false:
                 // Ensure that the input is padded correctly when it's not URL-safe
                 {
                     var charsWithoutPadding = s.TrimEnd('=');
                     var neededPadding = 4 - (charsWithoutPadding.Length % 4);
-                    if (neededPadding > 0)
+                    if (neededPadding > 0 && s.Length != charsWithoutPadding.Length + neededPadding)
                     {
                         // Add padding to the end of the string
                         var charsLength = charsWithoutPadding.Length + neededPadding;
@@ -332,26 +337,66 @@ public static class Base64
                         charsWithoutPadding.CopyTo(charsOwner.Span);
                         charsOwner.Span[^neededPadding..].Fill('=');
 
-                        return TryFromChars(charsOwner.Span[..charsLength], out result);
+                        return TryFromChars(
+                            charsOwner.Span[..charsLength],
+                            destination,
+                            out bytesWritten
+                        );
                     }
 
                     break;
                 }
         }
 
-        // Calculate the maximum length of the decoded bytes
-        var length = s.Length + 4; // Add extra space in case padding is missing
-        var decodeLength = isUrlSafe ? GetMaxUrlSafeDecodeLength(length) : GetMaxDecodeLength(length);
+        // Ensure that the destination buffer is big enough to hold the decoded data
+        var expectedMinLength = GetMaxDecodeLength(s);
+        if (destination.Length < expectedMinLength)
+        {
+            return false;
+        }
 
         // Try to decode the input
-        using var owner = SpanOwner<byte>.Allocate(decodeLength);
-        if (!(
-                (!isUrlSafe && ThirdParty.LitJWT.Base64.TryFromBase64Chars(s, owner.Span, out var bytesWritten)) ||
-                (isUrlSafe && ThirdParty.LitJWT.Base64.TryFromBase64UrlChars(s, owner.Span, out bytesWritten))
-            ))
+        return (!isUrlSafe && ThirdParty.LitJWT.Base64.TryFromBase64Chars(s, destination, out bytesWritten)) ||
+               (isUrlSafe && ThirdParty.LitJWT.Base64.TryFromBase64UrlChars(s, destination, out bytesWritten));
+    }
+
+    /// <summary>
+    /// Converts a Base64-encoded string into its corresponding byte array representation.
+    /// </summary>
+    /// <param name="str">The Base64-encoded string to convert. This can be null or empty.</param>
+    /// <param name="result">When the method returns, contains the resulting byte array if the conversion was
+    /// successful; otherwise, contains a default value.</param>
+    /// <returns>
+    /// <c>true</c> if the conversion was successful; otherwise, <c>false</c>.
+    /// </returns>
+    [ExcludeFromCodeCoverage]
+    public static bool TryFromString(string? str, out RentedArray<byte> result)
+    {
+        result = default;
+        return !string.IsNullOrWhiteSpace(str) && TryFromChars(str.AsSpan(), out result);
+    }
+
+    /// <summary>
+    /// Attempts to decode the provided span of characters as a Base64-encoded string.
+    /// </summary>
+    /// <param name="s">The read-only span of characters to decode.</param>
+    /// <param name="result">When this method returns, contains the decoded data as a rented array, if the
+    /// decode operation succeeded.</param>
+    /// <returns>
+    /// <c>true</c> if the span of characters was successfully decoded; otherwise, <c>false</c>.
+    /// </returns>
+    public static bool TryFromChars(in ReadOnlySpan<char> s, out RentedArray<byte> result)
+    {
+        result = default;
+        if (s.IsWhiteSpace())
         {
-            // The input is not valid Base64 or URL-safe Base64 string
-            result = default;
+            return false;
+        }
+
+        var expectedMinLength = GetMaxDecodeLength(s);
+        using var owner = SpanOwner<byte>.Allocate(expectedMinLength);
+        if (!TryFromChars(s, owner.Span, out var bytesWritten))
+        {
             return false;
         }
 
@@ -364,10 +409,10 @@ public static class Base64
     /// </summary>
     /// <param name="s">The Base64-encoded or URL-safe Base64 string to decode.</param>
     /// <returns>
-    /// A <see cref="RentedArray{T}"/> containing the decoded bytes.
+    /// An array containing the decoded <see cref="byte"/>s.
     /// </returns>
     [ExcludeFromCodeCoverage]
-    public static RentedArray<byte> FromString(string? s)
+    public static byte[] FromString(string? s)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(s);
         return FromChars(s.AsSpan());
@@ -378,9 +423,9 @@ public static class Base64
     /// </summary>
     /// <param name="s">The read-only span of Base64-encoded or URL-safe Base64 characters to decode.</param>
     /// <returns>
-    /// A <see cref="RentedArray{T}"/> containing the decoded bytes.
+    /// An array containing the decoded <see cref="byte"/>s.
     /// </returns>
-    public static RentedArray<byte> FromChars(in ReadOnlySpan<char> s)
+    public static byte[] FromChars(in ReadOnlySpan<char> s)
     {
         if (s.IsWhiteSpace())
         {
@@ -390,13 +435,17 @@ public static class Base64
             );
         }
 
-        if (!TryFromChars(s, out var result))
+        using var owner = SpanOwner<byte>.Allocate(GetMaxDecodeLength(s));
+        if (!TryFromChars(s, owner.Span, out var bytesWritten))
         {
             throw new FormatException(
                 "The input is not a valid Base-64 string as it contains a non-base 64 character, more than two " +
                 "padding characters, or an illegal character among the padding characters."
             );
         }
+
+        var result = new byte[bytesWritten];
+        owner.Span[..bytesWritten].CopyTo(result.AsSpan());
 
         return result;
     }

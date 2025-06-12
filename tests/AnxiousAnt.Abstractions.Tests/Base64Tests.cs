@@ -108,48 +108,38 @@ public class Base64Tests
     }
 
     [Fact]
-    public void GetMaxDecodeLength_ShouldThrowWhenGivenInvalidLength()
+    public void GetMaxDecodeLength_ShouldThrowWhenGivenNullInput()
     {
         // Arrange
-        Action act = () => Base64.GetMaxDecodeLength(-1);
+        Action act = () => Base64.GetMaxDecodeLength(null);
 
         // Assert
-        act.ShouldThrow<ArgumentOutOfRangeException>();
+        act.ShouldThrow<ArgumentNullException>();
     }
 
     [Theory]
-    [InlineData("aGVsbG8gd29ybGQ", 9)]
-    [InlineData("aGVsbG8gd29ybGQ=", 12)]
-    [InlineData("aGVsbG8gd29ybGQsIHRoaXMgaXMgYSBsb25nZXIgdGVzdA", 33)]
-    [InlineData("aGVsbG8gd29ybGQsIHRoaXMgaXMgYSBsb25nZXIgdGVzdA==", 36)]
-    [InlineData("aGVsbG8gd29ybGQ/sIHR+oaXMgaXMgYSBsb25nZXIgdGVzdA==", 36)]
-    public void GetMaxDecodeLength_ShouldReturnCorrectLength(string input, int expectedLength)
+    [InlineData("")]
+    [InlineData("     ")]
+    public void GetMaxDecodeLength_ShouldReturnZeroWhenGivenEmptyOrWhiteSpaceInput(string? input)
     {
         // Act
-        var length = Base64.GetMaxDecodeLength(input.Length);
+        var length = Base64.GetMaxDecodeLength(input);
 
         // Assert
-        length.ShouldBe(expectedLength);
-    }
-
-    [Fact]
-    public void GetMaxUrlSafeDecodeLength_ShouldThrowWhenGivenInvalidLength()
-    {
-        // Arrange
-        Action act = () => Base64.GetMaxDecodeLength(-1);
-
-        // Assert
-        act.ShouldThrow<ArgumentOutOfRangeException>();
+        length.ShouldBe(0);
     }
 
     [Theory]
     [InlineData("aGVsbG8gd29ybGQ", 12)]
+    [InlineData("aGVsbG8gd29ybGQ=", 12)]
     [InlineData("aGVsbG8gd29ybGQsIHRoaXMgaXMgYSBsb25nZXIgdGVzdA", 35)]
+    [InlineData("aGVsbG8gd29ybGQsIHRoaXMgaXMgYSBsb25nZXIgdGVzdA==", 36)]
+    [InlineData("aGVsbG8gd29ybGQ/sIHR+oaXMgaXMgYSBsb25nZXIgdGVzdA==", 36)]
     [InlineData("aGVsbG8gd29ybGQ_sIHR-oaXMgaXMgYSBsb25nZXIgdGVzdA", 36)]
-    public void GetMaxUrlSafeDecodeLength_ShouldReturnCorrectLength(string input, int expectedLength)
+    public void GetMaxDecodeLength_ShouldReturnCorrectLength(string input, int expectedLength)
     {
         // Act
-        var length = Base64.GetMaxUrlSafeDecodeLength(input.Length);
+        var length = Base64.GetMaxDecodeLength(input);
 
         // Assert
         length.ShouldBe(expectedLength);
@@ -347,11 +337,31 @@ public class Base64Tests
     [Theory]
     [InlineData(null)]
     [InlineData("")]
-    [InlineData("                ")]
+    [InlineData("       ")]
     public void TryFromString_ShouldReturnFalseWhenGivenNullEmptyOrWhiteSpaceString(string? input)
     {
+        // Arrange
+        var bytes = new byte[4];
+
         // Assert
-        Base64.TryFromString(input, out _).ShouldBe(false);
+        Base64.TryFromString(input, bytes.AsSpan(), out var bytesWritten).ShouldBeFalse();
+        bytes.ShouldBe("\0\0\0\0"u8.ToArray());
+        bytesWritten.ShouldBe(0);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("       ")]
+    public void TryFromChars_ShouldReturnFalseWhenGivenNullEmptyOrWhiteSpaceString(string? input)
+    {
+        // Arrange
+        var bytes = new byte[4];
+
+        // Assert
+        Base64.TryFromChars(input.AsSpan(), bytes.AsSpan(), out var bytesWritten).ShouldBeFalse();
+        bytes.ShouldBe("\0\0\0\0"u8.ToArray());
+        bytesWritten.ShouldBe(0);
     }
 
     [Theory]
@@ -362,44 +372,87 @@ public class Base64Tests
     public void TryFromChars_ShouldReturnFalseWhenGivenInvalidInput(string? input)
     {
         // Assert
-        Base64.TryFromChars(input.AsSpan(), out _).ShouldBe(false);
+        Base64.TryFromChars(input.AsSpan(), [], out _).ShouldBe(false);
+    }
+
+    [Fact]
+    public void TryFromChars_ShouldAddPaddingWhenInputIsNotUrlSafeAndIsMissingPadding()
+    {
+        // Arrange
+        const string input = "aGVsbG8gd29ybGQhIQ";
+        var bytes = new byte[100];
+
+        // Act
+        var result = Base64.TryFromChars(input.AsSpan(), bytes.AsSpan(), out var bytesWritten);
+
+        // Assert
+        result.ShouldBeTrue();
+        bytesWritten.ShouldBe(13);
+        bytes[..bytesWritten].ShouldBe("hello world!!"u8.ToArray());
+    }
+
+    [Fact]
+    public void TryFromChars_ShouldReturnFalseWhenDestinationIsTooSmall()
+    {
+        // Arrange
+        const string input = "aGVsbG8gd29ybGQ=";
+        var destination = new byte[1];
+
+        // Act
+        var result = Base64.TryFromChars(input.AsSpan(), destination.AsSpan(), out var bytesWritten);
+
+        // Assert
+        result.ShouldBeFalse();
+        bytesWritten.ShouldBe(0);
+        destination.ShouldBe([0]);
     }
 
     [Theory]
     [InlineData("aGVsbG8gd29ybGQ")]
-    [InlineData("aGVsbG8gd29ybGQ===========")]
-    [InlineData("aGVsbG8gd29_3-ybGQ")]
-    public void TryFromChars_ShouldReturnTrueWhenGivenValidBase64(string input)
+    [InlineData("aGVsbG8gd29ybGQ=")]
+    [InlineData("aGVsbG8gd29ybGQ=================")]
+    public void TryFromChars_ShouldReturnTrueForValidInput(string input)
     {
         // Arrange
-        var normalized = input.Replace('-', '+').Replace('_', '/').TrimEnd('=');
-        if (normalized.Length % 4 != 0)
-        {
-            var neededPadding = 4 - (normalized.Length % 4);
-            normalized += new string('=', neededPadding);
-        }
+        var bytes = new byte[12];
 
-        var expected = Convert.FromBase64String(GetWithPadding(input));
+        // Act
+        var result = Base64.TryFromChars(input.AsSpan(), bytes.AsSpan(), out var bytesWritten);
+
+        // Assert
+        result.ShouldBeTrue();
+        bytesWritten.ShouldBe(11);
+        bytes[..bytesWritten].ShouldBe("hello world"u8.ToArray());
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("                ")]
+    [InlineData("oaf09920!@$9niq9mr1")]
+    public void TryFromChars_ShouldReturnEmptyRentedArrayWhenGivenEmptyOrInvalidInput(string? input)
+    {
+        // Act
+        var result = Base64.TryFromChars(input.AsSpan(), out var bytes);
+
+        // Assert
+        result.ShouldBeFalse();
+        bytes.Length.ShouldBe(0);
+    }
+
+    [Fact]
+    public void TryFromChars_ShouldReturnExpectedRentedArray()
+    {
+        // Arrange
+        const string input = "aGVsbG8gd29ybGQ=";
 
         // Act
         var result = Base64.TryFromChars(input.AsSpan(), out var bytes);
 
         // Assert
         result.ShouldBeTrue();
-        bytes.Length.ShouldBe(expected.Length);
-        bytes.ToArray().ShouldBe(expected);
-    }
-
-    private static string GetWithPadding(string input)
-    {
-        var normalized = input.Replace('-', '+').Replace('_', '/').TrimEnd('=');
-        if (normalized.Length % 4 != 0)
-        {
-            var neededPadding = 4 - (normalized.Length % 4);
-            normalized += new string('=', neededPadding);
-        }
-
-        return normalized;
+        bytes.Length.ShouldBe(11);
+        bytes.ToArray().ShouldBe("hello world"u8.ToArray());
     }
 
     [Theory]
@@ -455,7 +508,7 @@ public class Base64Tests
         var expected = Convert.FromBase64String(input);
 
         // Act
-        using var result = Base64.FromString(input);
+        var result = Base64.FromString(input);
 
         // Assert
         result.Length.ShouldBe(expected.Length);

@@ -10,7 +10,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Remove="Bogus" />
     <PackageReference Remove="Verify.Xunit" />
   </ItemGroup>
 
