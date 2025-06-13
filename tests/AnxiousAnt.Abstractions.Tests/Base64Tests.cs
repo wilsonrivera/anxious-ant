@@ -207,13 +207,33 @@ public class Base64Tests
     }
 
     [Fact]
-    public void ToBase64_ShouldThrowWhenGivenNullBytes()
+    public void ToBase64_ShouldThrowWhenGivenNullString()
     {
         // Arrange
-        Action act = () => Base64.ToBase64(null!);
+        Action act = () => Base64.ToBase64((string)null!);
 
         // Assert
         act.ShouldThrow<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void ToBase64_ShouldThrowWhenGivenNullBytes()
+    {
+        // Arrange
+        Action act = () => Base64.ToBase64((byte[])null!);
+
+        // Assert
+        act.ShouldThrow<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void ToBase64_ShouldReturnEmptyStringWhenGivenEmptyString()
+    {
+        // Act
+        var result = Base64.ToBase64(string.Empty);
+
+        // Assert
+        result.ShouldBeEmpty();
     }
 
     [Fact]
@@ -227,7 +247,21 @@ public class Base64Tests
     }
 
     [Fact]
-    public void ToBase64_ShouldReturnExpectedResult()
+    public void ToBase64_String_ShouldReturnExpectedResult()
+    {
+        // Arrange
+        const string input = "hello world";
+        var expected = Convert.ToBase64String(EncodingUtils.SecureUtf8Encoding.GetBytes(input));
+
+        // Act
+        var result = Base64.ToBase64(input);
+
+        // Assert
+        result.ShouldBe(expected);
+    }
+
+    [Fact]
+    public void ToBase64_Bytes_ShouldReturnExpectedResult()
     {
         // Arrange
         var bytes = RandomNumberGenerator.GetBytes(Random.Shared.Next(0, 33));
@@ -301,13 +335,33 @@ public class Base64Tests
     }
 
     [Fact]
-    public void ToUrlSafeBase64_ShouldThrowWhenGivenNullBytes()
+    public void ToUrlSafeBase64_ShouldThrowWhenGivenNullString()
     {
         // Arrange
-        Action act = () => Base64.ToUrlSafeBase64(null!);
+        Action act = () => Base64.ToUrlSafeBase64((string)null!);
 
         // Assert
         act.ShouldThrow<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void ToUrlSafeBase64_ShouldThrowWhenGivenNullBytes()
+    {
+        // Arrange
+        Action act = () => Base64.ToUrlSafeBase64((byte[])null!);
+
+        // Assert
+        act.ShouldThrow<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void ToUrlSafeBase64_ShouldReturnEmptyStringWhenGivenEmptyString()
+    {
+        // Act
+        var result = Base64.ToUrlSafeBase64(string.Empty);
+
+        // Assert
+        result.ShouldBeEmpty();
     }
 
     [Fact]
@@ -321,7 +375,24 @@ public class Base64Tests
     }
 
     [Fact]
-    public void ToUrlSafeBase64_ShouldReturnExpectedResult()
+    public void ToUrlSafeBase64_String_ShouldReturnExpectedResult()
+    {
+        // Arrange
+        const string input = "hello world";
+        var expected = Convert.ToBase64String(EncodingUtils.SecureUtf8Encoding.GetBytes(input))
+            .Replace('+', '-')
+            .Replace('/', '_')
+            .TrimEnd('=');
+
+        // Act
+        var result = Base64.ToUrlSafeBase64(input);
+
+        // Assert
+        result.ShouldBe(expected);
+    }
+
+    [Fact]
+    public void ToUrlSafeBase64_Bytes_ShouldReturnExpectedResult()
     {
         // Arrange
         var bytes = RandomNumberGenerator.GetBytes(Random.Shared.Next(0, 33));

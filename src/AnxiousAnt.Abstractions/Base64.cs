@@ -161,6 +161,20 @@ public static class Base64
     }
 
     /// <summary>
+    /// Converts the specified string into its Base64-encoded string representation.
+    /// </summary>
+    /// <param name="str">The string to convert into a Base64-encoded string.</param>
+    /// <returns>
+    /// A Base64-encoded representation of the provided string. Returns an empty string if the input is null or empty.
+    /// </returns>
+    [ExcludeFromCodeCoverage]
+    public static string ToBase64(string? str)
+    {
+        ArgumentNullException.ThrowIfNull(str);
+        return ToBase64(str.AsSpan());
+    }
+
+    /// <summary>
     /// Converts the specified byte array to a Base64-encoded string.
     /// </summary>
     /// <param name="bytes">The byte array to be encoded.</param>
@@ -172,6 +186,29 @@ public static class Base64
     {
         ArgumentNullException.ThrowIfNull(bytes);
         return ToBase64(bytes.AsSpan());
+    }
+
+    /// <summary>
+    /// Encodes the specified read-only span of characters to a Base64-encoded string.
+    /// </summary>
+    /// <param name="s">The read-only span of characters to encode.</param>
+    /// <returns>
+    /// The Base64-encoded string representation of the input characters.
+    /// </returns>
+    public static string ToBase64(in ReadOnlySpan<char> s)
+    {
+        if (s.IsEmpty)
+        {
+            return string.Empty;
+        }
+
+        // Convert the given string to its byte representation
+        var inputByteCount = EncodingUtils.SecureUtf8Encoding.GetByteCount(s);
+        using var bytesOwner = SpanOwner<byte>.Allocate(inputByteCount, AllocationMode.Clear);
+        var bytesWritten = EncodingUtils.SecureUtf8Encoding.GetBytes(s, bytesOwner.Span);
+
+        // Convert the byte representation to Base64
+        return ToBase64(bytesOwner.Span[..bytesWritten]);
     }
 
     /// <summary>
@@ -245,6 +282,20 @@ public static class Base64
     }
 
     /// <summary>
+    /// Converts a string to a URL-safe Base64-encoded string.
+    /// </summary>
+    /// <param name="str">The input string to be encoded.</param>
+    /// <returns>
+    /// A URL-safe Base64-encoded string representation of the input string.
+    /// </returns>
+    [ExcludeFromCodeCoverage]
+    public static string ToUrlSafeBase64(string? str)
+    {
+        ArgumentNullException.ThrowIfNull(str);
+        return ToUrlSafeBase64(str.AsSpan());
+    }
+
+    /// <summary>
     /// Converts an array of bytes to a URL-safe Base64-encoded string.
     /// </summary>
     /// <param name="bytes">The array of bytes to be encoded.</param>
@@ -256,6 +307,29 @@ public static class Base64
     {
         ArgumentNullException.ThrowIfNull(bytes);
         return ToUrlSafeBase64(bytes.AsSpan());
+    }
+
+    /// <summary>
+    /// Converts the specified read-only span of characters to a URL-safe Base64-encoded string.
+    /// </summary>
+    /// <param name="s">The read-only span of characters to encode.</param>
+    /// <returns>
+    /// A URL-safe Base64-encoded string representing the provided input.
+    /// </returns>
+    public static string ToUrlSafeBase64(in ReadOnlySpan<char> s)
+    {
+        if (s.IsEmpty)
+        {
+            return string.Empty;
+        }
+
+        // Convert the given string to its byte representation
+        var inputByteCount = EncodingUtils.SecureUtf8Encoding.GetByteCount(s);
+        using var bytesOwner = SpanOwner<byte>.Allocate(inputByteCount, AllocationMode.Clear);
+        var bytesWritten = EncodingUtils.SecureUtf8Encoding.GetBytes(s, bytesOwner.Span);
+
+        // Convert the byte representation to Base64
+        return ToUrlSafeBase64(bytesOwner.Span[..bytesWritten]);
     }
 
     /// <summary>
