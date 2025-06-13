@@ -1,6 +1,6 @@
 namespace AnxiousAnt.Text;
 
-public class Porter2StemmerTests
+public class EnglishPorter2StemmerTests
 {
     [Theory]
     [InlineData(null)]
@@ -8,7 +8,7 @@ public class Porter2StemmerTests
     public void Stem_ShouldReturnEmptyStringWhenGivenNullOrEmptyString(string? input)
     {
         // Act
-        var result = Porter2Stemmer.Stem(input);
+        var result = EnglishPorter2Stemmer.Instance.Stem(input);
 
         // Assert
         result.ShouldBeEmpty();
@@ -21,7 +21,7 @@ public class Porter2StemmerTests
     public void Stem_ShouldReturnSameStringWhenGivenShortOrWhiteSpaceString(string input)
     {
         // Act
-        var result = Porter2Stemmer.Stem(input);
+        var result = EnglishPorter2Stemmer.Instance.Stem(input);
 
         // Assert
         result.ShouldBe(input);
@@ -36,13 +36,13 @@ public class Porter2StemmerTests
         // Assert
         foreach ((string input, string expected) in data)
         {
-            Porter2Stemmer.Stem(input).ShouldBe(expected);
+            EnglishPorter2Stemmer.Instance.Stem(input).ShouldBe(expected);
         }
     }
 
     private static IEnumerable<(string, string)> GetData()
     {
-        using var stream = File.OpenRead("./data/stemmer/data.csv");
+        using var stream = File.OpenRead("./dataset/porter-2-stemmer/english.csv");
         using var reader = new StreamReader(stream);
         while (!reader.EndOfStream)
         {

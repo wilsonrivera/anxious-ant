@@ -9,7 +9,7 @@ namespace AnxiousAnt.Text;
 /// <remarks>
 /// Adapted from https://github.com/nemec/porter2-stemmer/blob/5357533f474867ad126ad0aa81a447e5fbcf7576/Porter2Stemmer/EnglishPorter2Stemmer.cs
 /// </remarks>
-public static class Porter2Stemmer
+public sealed class EnglishPorter2Stemmer : IPorter2Stemmer
 {
     private static readonly SearchValues<char> Vowels = SearchValues.Create("aeiouy");
     private static readonly SearchValues<char> LiEndings = SearchValues.Create("cdeghkmnrt");
@@ -94,26 +94,17 @@ public static class Porter2Stemmer
         "ive", "ize"
     ];
 
-    /// <summary>
-    /// Reduces a word to its root or base form (stem) by applying the Porter2 stemming algorithm.
-    /// </summary>
-    /// <param name="word">The word to be stemmed.</param>
-    /// <returns>
-    /// The stemmed version of the input word. If the word is <c>null</c> or empty, an empty string is returned.
-    /// Words shorter than three characters are returned unchanged.
-    /// </returns>
-    public static string Stem(string? word) =>
-        string.IsNullOrEmpty(word) ? string.Empty : Stem(word.AsSpan());
+    private EnglishPorter2Stemmer()
+    {
+    }
 
     /// <summary>
-    /// Applies the Porter2 stemming algorithm to reduce a word to its base or root form.
+    /// Gets the singleton instance of the <see cref="EnglishPorter2Stemmer"/>.
     /// </summary>
-    /// <param name="word">The input word as a read-only span of characters to be stemmed.</param>
-    /// <returns>
-    /// The stemmed base form of the input word. If the input is empty or has a length of two or less,
-    /// the original string is returned.
-    /// </returns>
-    public static string Stem(in ReadOnlySpan<char> word)
+    public static EnglishPorter2Stemmer Instance { get; } = new();
+
+    /// <inheritdoc />
+    public string Stem(in ReadOnlySpan<char> word)
     {
         if (word.IsEmpty)
         {
