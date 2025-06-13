@@ -1,6 +1,6 @@
 using System.Reflection;
 
-namespace Snaqit.Reflection;
+namespace AnxiousAnt.Reflection;
 
 /// <summary>
 /// Provides access to the types loaded in the current application domain.
