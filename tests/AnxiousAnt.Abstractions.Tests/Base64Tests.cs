@@ -134,7 +134,7 @@ public class Base64Tests
     [InlineData("aGVsbG8gd29ybGQ=", 12)]
     [InlineData("aGVsbG8gd29ybGQsIHRoaXMgaXMgYSBsb25nZXIgdGVzdA", 35)]
     [InlineData("aGVsbG8gd29ybGQsIHRoaXMgaXMgYSBsb25nZXIgdGVzdA==", 36)]
-    [InlineData("aGVsbG8gd29ybGQ/sIHR+oaXMgaXMgYSBsb25nZXIgdGVzdA==", 36)]
+    [InlineData("aGVsbG8gd29ybGQ/sIHR+oaXMgaXMgYSBsb25nZXIgdGVzdA==", 39)]
     [InlineData("aGVsbG8gd29ybGQ_sIHR-oaXMgaXMgYSBsb25nZXIgdGVzdA", 36)]
     public void GetMaxDecodeLength_ShouldReturnCorrectLength(string input, int expectedLength)
     {

@@ -155,7 +155,8 @@ public struct RentedArray<T> : IDisposable
     public Enumerator GetEnumerator() => new(this);
 
     /// <summary>
-    /// Retrieves the underlying array used by the <see cref="RentedArray{T}"/> instance.
+    /// Retrieves the underlying array used by the <see cref="RentedArray{T}"/> instance. The returned array may
+    /// be longer than the actual length.
     /// </summary>
     /// <returns>
     /// The array backing this <see cref="RentedArray{T}"/> instance.

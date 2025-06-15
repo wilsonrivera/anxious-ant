@@ -108,9 +108,15 @@ public static class Base64
         }
 
         var isUrlSafe = IsUrlSafeBase64(s);
-        return isUrlSafe
-            ? ThirdParty.LitJWT.Base64.GetMaxBase64UrlDecodeLength(s.Length)
-            : ThirdParty.LitJWT.Base64.GetMaxBase64DecodeLength(s.Length);
+        if (isUrlSafe)
+        {
+            return ThirdParty.LitJWT.Base64.GetMaxBase64UrlDecodeLength(s.Length);
+        }
+
+        var charsWithoutPadding = s.TrimEnd('=');
+        var neededPadding = 4 - (charsWithoutPadding.Length % 4);
+
+        return ThirdParty.LitJWT.Base64.GetMaxBase64DecodeLength(charsWithoutPadding.Length + neededPadding);
     }
 
     /// <summary>
@@ -423,7 +429,10 @@ public static class Base64
         }
 
         // Ensure that the destination buffer is big enough to hold the decoded data
-        var expectedMinLength = GetMaxDecodeLength(s);
+        var expectedMinLength = isUrlSafe
+            ? ThirdParty.LitJWT.Base64.GetMaxBase64UrlDecodeLength(s.Length)
+            : ThirdParty.LitJWT.Base64.GetMaxBase64DecodeLength(s.Length);
+
         if (destination.Length < expectedMinLength)
         {
             return false;
