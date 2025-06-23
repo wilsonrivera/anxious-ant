@@ -1,5 +1,7 @@
 using System.Security.Cryptography;
 
+using AnxiousAnt.Text;
+
 namespace AnxiousAnt;
 
 /// <summary>
@@ -38,44 +40,95 @@ public static partial class RandomUtils
     }
 
     /// <summary>
-    /// Generates a random name from the list of adjectives and surnames formatted as "adjective_surname".
-    /// For example 'focused_turing'.
+    /// Fills the provided span with random characters, optionally including symbols in the character set.
     /// </summary>
-    /// <returns>
-    /// A randomly generated name.
-    /// </returns>
-    public static string GetRandomName() => GetRandomName(false);
+    /// <param name="destination">The span of characters to populate with random values.</param>
+    /// <param name="includeSymbols">A boolean that specifies whether symbols should be included in the character set.</param>
+    public static void GetRandomChars(Span<char> destination, bool includeSymbols = false)
+    {
+        if (destination.IsEmpty)
+        {
+            return;
+        }
+
+        RandomNumberGenerator.GetItems(
+            includeSymbols
+                ? RandomStringAlphabetWithSymbols.AsSpan()
+                : RandomStringAlphabet.AsSpan(),
+            destination
+        );
+    }
 
     /// <summary>
-    /// <para>
-    /// Generates a random name from the list of adjectives and surnames formatted as "adjective_surname".
-    /// For example 'focused_turing'.
-    /// </para>
-    /// <para>
-    /// If <paramref name="retry"/> is <c>true</c>, a random integer between 0 and 10 will be added to the end of
-    /// the name, e.g 'focused_turing3'.
-    /// </para>
+    /// Generates a random name from the list of adjectives and surnames formatted as "adjective-noun".
+    /// For example 'envious-otter'.
     /// </summary>
-    /// <param name="retry">A flag indicating whether to append a random digit to teh generated name.</param>
     /// <returns>
     /// A randomly generated name.
     /// </returns>
-    public static string GetRandomName(bool retry)
+    public static string GetRandomName()
     {
         using var leftDestination = SpanOwner<string>.Allocate(1);
         using var rightDestination = SpanOwner<string>.Allocate(1);
 
-        /* Steve Wozniak is not boring */
-        var attempt = 0;
-        do
-        {
-            RandomNumberGenerator.GetItems(AdjectivesPool, leftDestination.Span[..1]);
-            RandomNumberGenerator.GetItems(SurnamesPool, rightDestination.Span[..1]);
-            attempt++;
-        } while (leftDestination.Span[0] is "boring" && rightDestination.Span[0] is "wozniak" && attempt < 100);
+        RandomNumberGenerator.GetItems(AdjectivesPool, leftDestination.Span);
+        RandomNumberGenerator.GetItems(NounsPool, rightDestination.Span);
 
-        return retry
-            ? $"{leftDestination.Span[0]}_{rightDestination.Span[0]}{RandomNumberGenerator.GetInt32(10)}"
-            : $"{leftDestination.Span[0]}_{rightDestination.Span[0]}";
+        var sb = StringBuilderPool.Rent()
+            .Append(leftDestination.Span[0])
+            .Append('-')
+            .Append(rightDestination.Span[0]);
+
+        return StringBuilderPool.ToStringAndReturn(sb);
+    }
+
+    /// <summary>
+    /// Calculates the maximum possible length of a random name based on the longest adjective and noun
+    /// available in their respective pools.
+    /// </summary>
+    /// <returns>
+    /// The maximum length of a randomly generated name, which is computed as the sum of the longest adjective,
+    /// the longest noun, and an additional character for the separator.
+    /// </returns>
+    [ExcludeFromCodeCoverage]
+    public static int GetMaxPossibleRandomNameLength() =>
+        LazyMaxAdjectiveLength.Value + LazyMaxNounLength.Value + 1;
+
+    /// <summary>
+    /// Attempts to generate a random name combining a randomly selected adjective and noun.
+    /// </summary>
+    /// <param name="destination">The span where the generated random name will be written.</param>
+    /// <param name="charsWritten">The number of characters written into the <paramref name="destination"/>.</param>
+    /// <returns>
+    /// <c>true</c> if a random name was successfully generated and written to the provided
+    /// <paramref name="destination"/>; otherwise, <c>false</c>.
+    /// </returns>
+    public static bool TryGetRandomName(Span<char> destination, out int charsWritten)
+    {
+        charsWritten = 0;
+        if (destination.IsEmpty)
+        {
+            return false;
+        }
+
+        using var leftDestination = SpanOwner<string>.Allocate(1);
+        using var rightDestination = SpanOwner<string>.Allocate(1);
+
+        RandomNumberGenerator.GetItems(AdjectivesPool, leftDestination.Span);
+        RandomNumberGenerator.GetItems(NounsPool, rightDestination.Span);
+
+        var leftSpan = leftDestination.Span[0].AsSpan();
+        var rightSpan = rightDestination.Span[0].AsSpan();
+        if (destination.Length < leftSpan.Length + rightSpan.Length + 1)
+        {
+            return false;
+        }
+
+        leftSpan.CopyTo(destination);
+        destination[leftSpan.Length] = '-';
+        rightSpan.CopyTo(destination[(leftSpan.Length + 1)..]);
+        charsWritten = leftSpan.Length + rightSpan.Length + 1;
+
+        return true;
     }
 }

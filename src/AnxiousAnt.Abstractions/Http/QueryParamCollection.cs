@@ -246,13 +246,8 @@ public sealed partial class QueryParamCollection : IReadOnlyKeyValueCollection<s
     /// </summary>
     public void Clear()
     {
-        if (_values?.Count is not > 0)
-        {
-            return;
-        }
-
         _values?.Clear();
-        _changed = true;
+        _changed = _values?.Count is > 0;
     }
 
     /// <summary>
@@ -260,13 +255,8 @@ public sealed partial class QueryParamCollection : IReadOnlyKeyValueCollection<s
     /// </summary>
     public void Sort()
     {
-        if (_values?.Count is not > 0)
-        {
-            return;
-        }
-
         _values?.Sort(ValueComparer.Instance);
-        _changed = true;
+        _changed = _values?.Count is > 0;
     }
 
     private static KeyValueCollection<QueryParamValue>? ParseQueryString(string queryString)
