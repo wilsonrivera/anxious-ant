@@ -188,6 +188,16 @@ partial class UrlTests
         url.ToString().ShouldBe("https://example.org");
     }
 
+    [Fact]
+    public void WithHost_ShouldThrowWhenGivenHostIsInvalid()
+    {
+        // Arrange
+        Action act = () => new Url().WithHost("exa_mple.com");
+
+        // Assert
+        act.ShouldThrow<ArgumentException>();
+    }
+
     [Theory]
     [InlineData(null)]
     [InlineData("")]
@@ -374,7 +384,7 @@ partial class UrlTests
         var url = Url.Parse("https://example.com");
 
         // Act
-        _= url.AddPathSegments("test", "segment");
+        _ = url.AddPathSegments("test", "segment");
 
         // Assert
         url.PathSegments.Count.ShouldBe(2);

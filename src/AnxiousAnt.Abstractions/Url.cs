@@ -14,11 +14,12 @@ namespace AnxiousAnt;
 public sealed partial class Url : IEquatable<Url>
 {
     private const string EmptySlashPath = "/";
+    private const string InternationalHostNamePrefix = "xn--";
 
     private static readonly Lazy<IdnMapping> LazyIdnMapping = new(static () => new IdnMapping());
 
     private static readonly SearchValues<char> AsciiHostNameChars =
-        SearchValues.Create("abcdefgjijklmnopqrstuvwxyz0123456789.-");
+        SearchValues.Create("abcdefghijklmnopqrstuvwxyz0123456789.-");
 
     private string? _userInfo;
     private string? _authority;

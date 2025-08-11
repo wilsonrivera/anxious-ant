@@ -80,7 +80,16 @@ partial class Url
     /// </returns>
     public Url WithHost(string host)
     {
-        Host = host.IfNullOrWhiteSpace(string.Empty);
+        if (string.IsNullOrWhiteSpace(host))
+        {
+            host = string.Empty;
+        }
+        else if (!IsValidHostName(host))
+        {
+            throw new ArgumentException($"Invalid host name '{host}'.", nameof(host));
+        }
+
+        Host = host;
         OnAuthorityChange();
         return this;
     }
@@ -100,11 +109,22 @@ partial class Url
         }
 
         var host = Host;
-        var hostType = Uri.CheckHostName(host);
-        return hostType is UriHostNameType.Basic or UriHostNameType.Dns &&
-               host.AsSpan().ContainsAnyExcept(AsciiHostNameChars)
-            ? new Url(this).WithHost(LazyIdnMapping.Value.GetAscii(host))
-            : this;
+        if (Uri.CheckHostName(host) is UriHostNameType.Basic or UriHostNameType.Dns &&
+            host.AsSpan().ContainsAnyExcept(AsciiHostNameChars))
+        {
+            try
+            {
+                // Skip using `WithHost` to skip validation
+                Host = LazyIdnMapping.Value.GetAscii(host);
+                OnAuthorityChange();
+            }
+            catch
+            {
+                // ignore
+            }
+        }
+
+        return this;
     }
 
     /// <summary>
@@ -126,10 +146,15 @@ partial class Url
         foreach (var part in hostSpan.Split('.'))
         {
             var value = hostSpan[part];
-            if (value.StartsWith("xn--", StringComparison.Ordinal))
+            if (!value.StartsWith(InternationalHostNamePrefix, StringComparison.OrdinalIgnoreCase))
             {
-                return new Url(this).WithHost(LazyIdnMapping.Value.GetUnicode(host));
+                continue;
             }
+
+            // Skip using `WithHost` to skip validation
+            Host = LazyIdnMapping.Value.GetUnicode(host);
+            OnAuthorityChange();
+            break;
         }
 
         return this;
