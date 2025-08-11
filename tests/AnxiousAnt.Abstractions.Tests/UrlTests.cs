@@ -499,6 +499,34 @@ public partial class UrlTests
     }
 
     [Fact]
+    public void Clone_ShouldPreserveLeadingSlash()
+    {
+        // Arrange
+        var url = Url.Parse("https://example.example.com/a/b/c/d");
+
+        // Act
+        var clone = url.Clone();
+        clone.SetQueryParam("a", "b");
+
+        // Assert
+        clone.ToString().ShouldBe("https://example.example.com/a/b/c/d?a=b");
+    }
+
+    [Fact]
+    public void Clone_ShouldPreserveTrailingSlash()
+    {
+        // Arrange
+        var url = Url.Parse("https://example.example.com/a/b/c/d/");
+
+        // Act
+        var clone = url.Clone();
+        clone.SetQueryParam("a", "b");
+
+        // Assert
+        clone.ToString().ShouldBe("https://example.example.com/a/b/c/d/?a=b");
+    }
+
+    [Fact]
     public void ResetToRoot_ShouldResetUrl()
     {
         // Arrange

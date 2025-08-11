@@ -77,6 +77,8 @@ public sealed partial class Url : IEquatable<Url>
         _authority = other._authority;
         _root = other._root;
         _path = other._path;
+        _hasLeadingSlash = other._hasLeadingSlash;
+        _hasTrailingSlash = other._hasTrailingSlash;
         _changed = other._changed;
         _uri = other._uri;
 
