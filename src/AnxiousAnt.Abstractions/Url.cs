@@ -13,26 +13,6 @@ namespace AnxiousAnt;
 /// </summary>
 public sealed partial class Url : IEquatable<Url>
 {
-    /// <summary>
-    /// Represents the "https" scheme, commonly used for Secure HTTP connections.
-    /// </summary>
-    public const string HttpsScheme = "https";
-
-    /// <summary>
-    /// Represents the "wss" scheme, typically used for Secure WebSocket connections.
-    /// </summary>
-    public const string WssScheme = "wss";
-
-    /// <summary>
-    /// Represents the "sftp" scheme, used for Secure File Transfer Protocol.
-    /// </summary>
-    public const string SftpScheme = "sftp";
-
-    /// <summary>
-    /// Represents the "data" scheme, commonly used for inline data URL representations.
-    /// </summary>
-    public const string DataScheme = "data";
-
     private const string EmptySlashPath = "/";
 
     private static readonly Lazy<IdnMapping> LazyIdnMapping = new(static () => new IdnMapping());
@@ -101,11 +81,6 @@ public sealed partial class Url : IEquatable<Url>
     /// Gets the scheme (e.g., "http", "https").
     /// </summary>
     public string Scheme { get; private set; } = string.Empty;
-
-    /// <summary>
-    /// Indicates whether the URL uses the "data" scheme, commonly associated with inline data.
-    /// </summary>
-    public bool IsDataUrl => Scheme.OrdinalEquals(DataScheme, true);
 
     /// <summary>
     /// Gets the username for authentication.
@@ -280,17 +255,6 @@ public sealed partial class Url : IEquatable<Url>
     /// Gets a value indicating whether this <see cref="Url"/> is relative.
     /// </summary>
     public bool IsRelative => string.IsNullOrWhiteSpace(Scheme);
-
-    /// <summary>
-    /// Gets a value indicating whether the scheme is secure (e.g., "https", "wss").
-    /// </summary>
-    public bool IsSecureScheme =>
-        !IsRelative &&
-        (
-            Scheme.OrdinalEquals(HttpsScheme, true) ||
-            Scheme.OrdinalEquals(WssScheme, true) ||
-            Scheme.OrdinalEquals(SftpScheme, true)
-        );
 
     /// <inheritdoc />
     public override string ToString() => ToUri().OriginalString;

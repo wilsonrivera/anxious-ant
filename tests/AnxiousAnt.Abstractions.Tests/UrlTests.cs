@@ -271,45 +271,6 @@ public partial class UrlTests
     #endregion
 
     [Fact]
-    public void IsDataUrl_ShouldReturnTrueForDataUrl()
-    {
-        // Arrange
-        var url = Url.Parse("data:text/plain;base64,SGVsbG8gV29ybGQh");
-
-        // Assert
-        url.IsDataUrl.ShouldBeTrue();
-    }
-
-    [Fact]
-    public void IsDataUrl_ShouldReturnFalseForNonDataUrl()
-    {
-        // Arrange
-        var url = Url.Parse("https://example.com");
-
-        // Assert
-        url.IsDataUrl.ShouldBeFalse();
-    }
-
-    [Theory]
-    [InlineData("http://example.com", false)]
-    [InlineData("https://example.com", true)]
-    [InlineData("ws://example.com", false)]
-    [InlineData("wss://example.com", true)]
-    [InlineData("ftp://example.com", false)]
-    [InlineData("sftp://example.com", true)]
-    public void IsSecureScheme_ShouldReturnExpectedValue(string input, bool expected)
-    {
-        // Arrange
-        var url = Url.Parse(input);
-
-        // Act
-        var result = url.IsSecureScheme;
-
-        // Assert
-        result.ShouldBe(expected);
-    }
-
-    [Fact]
     public void ToString_ShouldReturnExpectedValue()
     {
         // Arrange
