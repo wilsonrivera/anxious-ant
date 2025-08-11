@@ -15,7 +15,16 @@ partial class Url
     /// </returns>
     public Url WithScheme(string? scheme)
     {
-        Scheme = scheme.IfNullOrWhiteSpace(string.Empty);
+        if (string.IsNullOrWhiteSpace(scheme))
+        {
+            scheme = string.Empty;
+        }
+        else if (!Uri.CheckSchemeName(scheme))
+        {
+            throw new ArgumentException($"Invalid scheme '{scheme}'.", nameof(scheme));
+        }
+
+        Scheme = scheme;
         OnRootChange();
         return this;
     }

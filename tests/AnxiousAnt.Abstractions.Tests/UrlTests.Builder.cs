@@ -47,6 +47,40 @@ partial class UrlTests
         url.ToString().ShouldBe("https://example.com");
     }
 
+    [Theory]
+    [InlineData("https")]
+    [InlineData("fake-scheme")]
+    public void WithScheme_ShouldSetSchemeWhenGivenValidScheme(string scheme)
+    {
+        // Arrange
+        var url = new Url();
+
+        // Act
+        url.WithScheme(scheme);
+
+        // Assert
+        url.Scheme.ShouldBe(scheme);
+    }
+
+    [Theory]
+    [InlineData("1http")]
+    [InlineData("http!")]
+    [InlineData("ht*tp")]
+    [InlineData("h tt p")]
+    [InlineData("http://")]
+    [InlineData(":scheme")]
+    [InlineData("_http")]
+    [InlineData("http_")]
+    [InlineData("http/")]
+    public void WithScheme_ShouldThrowWhenSchemeIsInvalid(string scheme)
+    {
+        // Arrange
+        Action act = () => new Url().WithScheme(scheme);
+
+        // Assert
+        act.ShouldThrow<ArgumentException>();
+    }
+
     #endregion
 
     #region UserInfo
