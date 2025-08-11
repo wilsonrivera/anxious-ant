@@ -59,11 +59,34 @@ public static class StringBuilderPool
 
         var length = sb.Length;
         var result = length == 0 ? string.Empty : sb.ToString();
-        if (LazyPool.IsValueCreated)
-        {
-            LazyPool.Value.Return(sb);
-        }
+        Return(sb);
 
         return result;
+    }
+
+    /// <summary>
+    /// Copies the content of the specified <see cref="StringBuilder"/> to the provided destination span
+    /// and returns the <see cref="StringBuilder"/> to the pool for reuse.
+    /// </summary>
+    /// <param name="sb">The <see cref="StringBuilder"/> instance containing the data to copy.</param>
+    /// <param name="destination">The span where the content of the <see cref="StringBuilder"/> will be copied.</param>
+    /// <returns>
+    /// The number of characters copied from the <see cref="StringBuilder"/> to the destination span.
+    /// </returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public static int CopyToAndReturn(StringBuilder sb, Span<char> destination)
+    {
+        ArgumentNullException.ThrowIfNull(sb);
+
+        var length = sb.Length;
+        if (length == 0)
+        {
+            Return(sb);
+            return 0;
+        }
+
+        sb.CopyTo(0, destination, length);
+        Return(sb);
+        return length;
     }
 }
