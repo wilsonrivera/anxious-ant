@@ -80,6 +80,26 @@ public static class Singleton<T>
     }
 
     /// <summary>
+    /// Returns the singleton instance of the specified type if it exists; otherwise, returns the provided
+    /// fallback value.
+    /// </summary>
+    /// <param name="value">The fallback value to return if the singleton instance does not exist.</param>
+    /// <returns>
+    /// The singleton instance if it exists; otherwise, the provided fallback value.
+    /// </returns>
+    [MethodImpl(MethodImplOptions.Synchronized)]
+    public static T Or(T value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        if (s_instance is { } result)
+        {
+            return result;
+        }
+
+        return value;
+    }
+
+    /// <summary>
     /// Retrieves the current singleton instance if it exists, or sets it to the provided default value and returns it.
     /// </summary>
     /// <param name="defaultValue">The value to set as the singleton instance if it does not already exist.</param>

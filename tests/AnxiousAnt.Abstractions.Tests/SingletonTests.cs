@@ -113,9 +113,47 @@ public class SingletonTests
     }
 
     [Fact]
+    public void Or_ShouldThrowWhenGivenNull()
+    {
+        // Arrange
+        Action act = () => Singleton<object>.Or(null!);
+
+        // Assert
+        act.ShouldThrow<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void Or_ShouldReturnExistingValue()
+    {
+        // Arrange
+        var value = new object();
+        var defaultValue = new object();
+        Singleton<object>.ReplaceWith(value);
+
+        // Act
+        var result = Singleton<object>.Or(defaultValue);
+
+        // Assert
+        result.ShouldBeSameAs(value);
+    }
+
+    [Fact]
+    public void Or_ShouldReturnGivenValueWhenValueDoesNotExist()
+    {
+        // Arrange
+        var defaultValue = new Temp();
+
+        // Act
+        var result = Singleton<Temp>.Or(defaultValue);
+
+        // Assert
+        result.ShouldBeSameAs(defaultValue);
+    }
+
+    [Fact]
     public void GetOrSet_ShouldThrowArgumentNullExceptionWhenDefaultValueIsNull()
     {
-        // Act
+        // Arrange
         Action act = () => Singleton<object>.GetOrSet(null!);
 
         // Assert
@@ -223,6 +261,8 @@ public class SingletonTests
         created.ShouldBeFalse();
         result.ShouldBeSameAs(existingValue);
     }
+
+    private sealed class Temp;
 
     private sealed class Disposable : IDisposable
     {
