@@ -199,23 +199,10 @@ partial class UrlTests
     }
 
     [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("     ")]
-    [InlineData("example.com")]
-    public void WithAsciiHost_ShouldReturnSameInstanceWhenHostIsNotAnIdn(string? host)
-    {
-        // Arrange
-        var url = new Url().WithHost(host!);
-
-        // Act
-        var updated = url.WithAsciiHost();
-
-        // Assert
-        updated.ShouldBeSameAs(url);
-    }
-
-    [Theory]
+    [InlineData("example.com", "example.com")]
+    [InlineData("127.0.0.1", "127.0.0.1")]
+    [InlineData("::1", "::1")]
+    [InlineData("xn--bcher-kva.com", "xn--bcher-kva.com")]
     [InlineData("bücher.com", "xn--bcher-kva.com")]
     [InlineData("мойдомен.рф", "xn--d1acklchcc.xn--p1ai")]
     [InlineData("παράδειγμα.δοκιμή", "xn--hxajbheg2az3al.xn--jxalpdlp")]
@@ -232,23 +219,10 @@ partial class UrlTests
     }
 
     [Theory]
-    [InlineData(null)]
-    [InlineData("")]
-    [InlineData("     ")]
-    [InlineData("example.com")]
-    public void WithUnicodeHost_ShouldReturnSameInstanceWhenHostIsNotAnIdn(string? host)
-    {
-        // Arrange
-        var url = new Url().WithHost(host!);
-
-        // Act
-        var updated = url.WithUnicodeHost();
-
-        // Assert
-        updated.ShouldBeSameAs(url);
-    }
-
-    [Theory]
+    [InlineData("example.com", "example.com")]
+    [InlineData("127.0.0.1", "127.0.0.1")]
+    [InlineData("::1", "::1")]
+    [InlineData("bücher.com", "bücher.com")]
     [InlineData("xn--bcher-kva.com", "bücher.com")]
     [InlineData("xn--d1acklchcc.xn--p1ai", "мойдомен.рф")]
     [InlineData("xn--hxajbheg2az3al.xn--jxalpdlp", "παράδειγμα.δοκιμή")]

@@ -98,30 +98,32 @@ partial class Url
     /// Converts the host of the URL to its ASCII representation if it is an Internationalized Domain Name (IDN).
     /// </summary>
     /// <returns>
-    /// The current <see cref="Url"/> instance with the host updated to its ASCII representation, or the same
-    /// instance if the host is already in a valid ASCII format or is null/empty.
+    /// The current <see cref="Url"/> instance for chaining.
     /// </returns>
     public Url WithAsciiHost()
     {
-        if (string.IsNullOrWhiteSpace(Host))
+        var host = Host;
+        if (string.IsNullOrWhiteSpace(host) ||
+            Uri.CheckHostName(host) is not UriHostNameType.Basic and not UriHostNameType.Dns)
         {
             return this;
         }
 
-        var host = Host;
-        if (Uri.CheckHostName(host) is UriHostNameType.Basic or UriHostNameType.Dns &&
-            host.AsSpan().ContainsAnyExcept(AsciiHostNameChars))
+        var hostSpan = host.AsSpan();
+        if (!hostSpan.ContainsAnyExcept(AsciiHostNameChars))
         {
-            try
-            {
-                // Skip using `WithHost` to skip validation
-                Host = LazyIdnMapping.Value.GetAscii(host);
-                OnAuthorityChange();
-            }
-            catch
-            {
-                // ignore
-            }
+            return this;
+        }
+
+        try
+        {
+            // Skip using `WithHost` to skip validation
+            Host = LazyIdnMapping.Value.GetAscii(host);
+            OnAuthorityChange();
+        }
+        catch
+        {
+            // ignore
         }
 
         return this;
@@ -131,18 +133,24 @@ partial class Url
     /// Converts the current host to its Unicode representation if it contains Punycode encoding.
     /// </summary>
     /// <returns>
-    /// The current <see cref="Url"/> instance with the Unicode host set, or the original instance
-    /// if no conversion is necessary.
+    /// The current <see cref="Url"/> instance for chaining.
     /// </returns>
     public Url WithUnicodeHost()
     {
-        if (string.IsNullOrWhiteSpace(Host))
+        var host = Host;
+        if (string.IsNullOrWhiteSpace(host) ||
+            Uri.CheckHostName(host) is not UriHostNameType.Basic and not UriHostNameType.Dns)
         {
             return this;
         }
 
-        var host = Host;
         var hostSpan = host.AsSpan();
+        if (hostSpan.ContainsAnyExcept(AsciiHostNameChars))
+        {
+            // The host is not in ASCII format, so we can't convert it to Unicode'
+            return this;
+        }
+
         foreach (var part in hostSpan.Split('.'))
         {
             var value = hostSpan[part];
