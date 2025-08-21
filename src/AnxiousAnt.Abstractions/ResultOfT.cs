@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.ExceptionServices;
 using System.Runtime.InteropServices;
+using System.Text.Json.Serialization;
 
 namespace AnxiousAnt;
 
@@ -15,6 +16,13 @@ public readonly struct Result<T> where T : notnull
     private readonly bool _initialized;
     private readonly T? _value;
     private readonly ExceptionDispatchInfo? _exceptionDispatchInfo;
+
+    /// <summary>
+    /// Initializes a new successful result with the default value.
+    /// </summary>
+    public Result() : this((T?)default)
+    {
+    }
 
     /// <summary>
     /// Initializes a new successful result.
@@ -39,6 +47,34 @@ public readonly struct Result<T> where T : notnull
         _exceptionDispatchInfo = exceptionDispatchInfo;
     }
 
+    internal Result(in Result<Result<T>> other)
+    {
+        if (!other._initialized)
+        {
+            this = default;
+            return;
+        }
+
+        var edi = other._exceptionDispatchInfo ?? other._value._exceptionDispatchInfo;
+        if (edi is not null)
+        {
+            _initialized = true;
+            Unsafe.SkipInit(out _value);
+            _exceptionDispatchInfo = edi;
+        }
+        else
+        {
+            _initialized = other._value._initialized;
+            _value = other._value._value;
+        }
+    }
+
+    /// <summary>
+    /// Gets a value indicating whether the result represents the default, uninitialized state.
+    /// </summary>
+    [JsonIgnore]
+    public bool IsDefault => !_initialized;
+
     /// <summary>
     /// Gets a value indicating whether the operation resulting in this instance was successful.
     /// </summary>
@@ -47,12 +83,14 @@ public readonly struct Result<T> where T : notnull
     /// <summary>
     /// Gets a value indicating whether the operation resulting in this instance wasn't successful.
     /// </summary>
+    [JsonIgnore]
     [MemberNotNullWhen(true, nameof(Error))]
     public bool IsFailure => _initialized && _exceptionDispatchInfo is not null;
 
     /// <summary>
     /// Gets a value indicating whether the current instance contains a valid and non-null value.
     /// </summary>
+    [JsonIgnore]
     [MemberNotNullWhen(true, nameof(Value))]
     [MemberNotNullWhen(true, nameof(ValueRef))]
     public bool HasValue => IsSuccessful && _value is not null;
@@ -74,6 +112,7 @@ public readonly struct Result<T> where T : notnull
     /// Gets a reference to the value stored in the result when the operation is successful; otherwise throws
     /// the stored exception.
     /// </summary>
+    [JsonIgnore]
     public ref readonly T ValueRef
     {
         [UnscopedRef]
@@ -137,55 +176,17 @@ public readonly struct Result<T> where T : notnull
     /// The stored value if the operation is successful; otherwise, the default value of the underlying type.
     /// </returns>
     [Pure, ExcludeFromCodeCoverage]
-    public T? GetValueOrDefault() => GetValueOrDefault(default);
+    public T? ValueOrDefault() => ValueOr(default);
 
     /// <summary>
     /// Gets the value stored in the result if the operation was successful; otherwise, returns the provided
-    /// <paramref name="defaultValue"/>.
+    /// <paramref name="alternative"/>.
     /// </summary>
     /// <returns>
-    /// The value stored in the result if successful; otherwise, the provided <paramref name="defaultValue"/>.
+    /// The value stored in the result if successful; otherwise, the provided <paramref name="alternative"/>.
     /// </returns>
     [Pure]
-    public T? GetValueOrDefault(T? defaultValue) => IsSuccessful ? _value : defaultValue;
-
-    /// <summary>
-    /// Executes the specified action if the result is successful, passing the result value to the action.
-    /// </summary>
-    /// <param name="onSuccess">The action to execute if the result is successful. This action receives the result
-    /// value as its parameter.</param>
-    /// <returns>
-    /// The current <see cref="Result{T}"/> instance, allowing for method chaining.
-    /// </returns>
-    public Result<T> OnSuccess(Action<T?> onSuccess)
-    {
-        ArgumentNullException.ThrowIfNull(onSuccess);
-        if (IsSuccessful)
-        {
-            onSuccess(Value);
-        }
-
-        return this;
-    }
-
-    /// <summary>
-    /// Executes the specified action if the result represents a failure,
-    /// allowing custom handling of the exception.
-    /// </summary>
-    /// <param name="onFailure">The action to execute. Receives the exception as an argument.</param>
-    /// <returns>
-    /// The current <see cref="Result{T}"/> instance, allowing for method chaining.
-    /// </returns>
-    public Result<T> OnFailure(Action<Exception> onFailure)
-    {
-        ArgumentNullException.ThrowIfNull(onFailure);
-        if (IsFailure)
-        {
-            onFailure(Error);
-        }
-
-        return this;
-    }
+    public T? ValueOr(T? alternative) => IsSuccessful ? _value : alternative;
 
     /// <summary>
     /// Returns a new result with the specified default value if the current instance represents a failure.
@@ -197,25 +198,26 @@ public readonly struct Result<T> where T : notnull
     /// a failure, or the current instance if it represents success.
     /// </returns>
     [Pure]
-    public Result<T> IfFailure(T? defaultValue)
+    public Result<T> Or(T? defaultValue)
     {
         ThrowIfUninitialized();
         return IsFailure ? new Result<T>(defaultValue) : this;
     }
 
     /// <summary>
-    /// Returns a new <see cref="Result{T}"/> instance with a specified default value if the current result is a failure.
+    /// Returns a new <see cref="Result{T}"/> instance with a specified default value if the current
+    /// result is a failure.
     /// </summary>
-    /// <param name="onFailure">A function to invoke if the result is a failure. It provides the exception from the
+    /// <param name="factory">A function to invoke if the result is a failure. It provides the exception from the
     /// failure and returns a value to be used.</param>
     /// <returns>
-    /// A new <see cref="Result{T}"/> instance with the value returned by the <paramref name="onFailure"/> function
+    /// A new <see cref="Result{T}"/> instance with the value returned by the <paramref name="factory"/> function
     /// if the result is a failure, otherwise the current result.
     /// </returns>
     [Pure]
-    public Result<T> IfFailure(Func<Exception, T?> onFailure)
+    public Result<T> Or(Func<Exception, T?> factory)
     {
-        ArgumentNullException.ThrowIfNull(onFailure);
+        ArgumentNullException.ThrowIfNull(factory);
         ThrowIfUninitialized();
         if (IsSuccessful)
         {
@@ -224,12 +226,137 @@ public readonly struct Result<T> where T : notnull
 
         try
         {
-            var result = onFailure(Error);
+            var result = factory(Error);
             return new Result<T>(result);
         }
         catch (Exception ex)
         {
             return new Result<T>(ExceptionDispatchInfo.Capture(ex));
+        }
+    }
+
+    /// <summary>
+    /// Returns the original result if it is successful; otherwise, returns the specified alternative result.
+    /// </summary>
+    /// <param name="alternative">The alternative result to return if the original result is a failure.</param>
+    /// <returns>
+    /// The original result if it is successful; otherwise, the specified alternative result.
+    /// </returns>
+    [Pure]
+    public Result<T> OrElse(in Result<T> alternative) => IsSuccessful ? this : alternative;
+
+    /// <summary>
+    /// Returns the current <see cref="Result{T}"/> if it is successful; otherwise, invokes the specified factory and
+    /// returns the result produced by the factory.
+    /// </summary>
+    /// <typeparam name="T">The type of the underlying value.</typeparam>
+    /// <param name="factory">A delegate that is invoked to produce a new <see cref="Result{T}"/> if the current
+    /// result is not successful.</param>
+    /// <returns>
+    /// A <see cref="Result{T}"/> that contains either the current value or the value produced by the factory.
+    /// </returns>
+    /// <exception cref="ArgumentNullException">Thrown when the factory is <c>null</c>.</exception>
+    [Pure]
+    public Result<T> OrElse(Func<Exception?, Result<T>> factory)
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        if (IsSuccessful)
+        {
+            return this;
+        }
+
+        try
+        {
+            return factory(Error);
+        }
+        catch (Exception ex)
+        {
+            return new Result<T>(ExceptionDispatchInfo.Capture(ex));
+        }
+    }
+
+    /// <summary>
+    /// Executes the specified action if the result is successful, passing the result value to the action.
+    /// </summary>
+    /// <param name="onSuccess">The action to execute if the result is successful. This action receives the result
+    /// value as its parameter.</param>
+    public void OnSuccess(Action<T?> onSuccess)
+    {
+        ArgumentNullException.ThrowIfNull(onSuccess);
+        ThrowIfUninitialized();
+        if (!IsSuccessful)
+        {
+            return;
+        }
+
+        onSuccess(Value);
+    }
+
+    /// <summary>
+    /// Executes the specified action if the result represents a failure,
+    /// allowing custom handling of the exception.
+    /// </summary>
+    /// <param name="onFailure">The action to execute. Receives the exception as an argument.</param>
+    public void OnFailure(Action<Exception> onFailure)
+    {
+        ArgumentNullException.ThrowIfNull(onFailure);
+        ThrowIfUninitialized();
+        if (!IsFailure)
+        {
+            return;
+        }
+
+        onFailure(Error);
+    }
+
+    /// <summary>
+    /// Executes one of the provided actions depending on whether the result is successful or a failure.
+    /// </summary>
+    /// <param name="onSuccess">The action to execute if the result is successful.</param>
+    /// <param name="onFailure">The action to execute if the result is a failure.</param>
+    public void Match(Action<T> onSuccess, Action<Exception> onFailure)
+    {
+        ArgumentNullException.ThrowIfNull(onSuccess);
+        ArgumentNullException.ThrowIfNull(onFailure);
+        ThrowIfUninitialized();
+
+        if (IsSuccessful)
+        {
+            onSuccess(Value);
+        }
+        else if (IsFailure)
+        {
+            onFailure(Error);
+        }
+    }
+
+    /// <summary>
+    /// Asynchronously executes one of the provided actions depending on whether the result is successful
+    /// or a failure.
+    /// </summary>
+    /// <param name="onSuccess">The action to execute when the result is successful.</param>
+    /// <param name="onFailure">The action to execute when the result is a failure.</param>
+    /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
+    /// <returns>
+    /// A task representing the asynchronous operation.
+    /// </returns>
+    public async ValueTask MatchAsync(
+        Func<T, CancellationToken, Task> onSuccess,
+        Func<Exception, CancellationToken, Task> onFailure,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(onSuccess);
+        ArgumentNullException.ThrowIfNull(onFailure);
+        ThrowIfUninitialized();
+
+        if (IsSuccessful)
+        {
+            await onSuccess(Value, cancellationToken).ConfigureAwait(false);
+        }
+        else if (IsFailure)
+        {
+            await onFailure(Error, cancellationToken).ConfigureAwait(false);
         }
     }
 
@@ -347,7 +474,7 @@ public readonly struct Result<T> where T : notnull
 
         try
         {
-            var result = await transform(Value, cancellationToken);
+            var result = await transform(Value, cancellationToken).ConfigureAwait(false);
             return new Result<TOutput>(result);
         }
         catch (Exception ex)
@@ -401,6 +528,7 @@ public readonly struct Result<T> where T : notnull
     /// <returns>
     /// <c>true</c> if the result is not successful, otherwise <c>false</c>.
     /// </returns>
+    [ExcludeFromCodeCoverage]
     public static bool operator false(in Result<T> result) => !result;
 
     /// <summary>
@@ -423,7 +551,7 @@ public readonly struct Result<T> where T : notnull
     /// The value of the result if successful, otherwise the fallback value.
     /// </returns>
     public static T? operator |(in Result<T> left, T? right) =>
-        left.GetValueOrDefault(right);
+        left.ValueOr(right);
 
     /// <summary>
     /// Selects the first successful result in a logical OR operation between two results.
