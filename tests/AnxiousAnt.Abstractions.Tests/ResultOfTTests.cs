@@ -25,7 +25,7 @@ public class ResultOfTTests
     }
 
     [Fact]
-    public void ParameterlessCtor_ShouldCreateSuccessfulResultWithDefaultValue()
+    public void Ctor_WithoutParameters_ShouldCreateSuccessfulResultWithDefaultValue()
     {
         // Arrange
         Result<int> result = new();
@@ -45,7 +45,7 @@ public class ResultOfTTests
     }
 
     [Fact]
-    public void Ctor_ShouldCreateSuccessfulResult()
+    public void Ctor_WithValue_ShouldCreateSuccessfulResult()
     {
         // Arrange
         var result = new Result<int>(42);
@@ -65,7 +65,7 @@ public class ResultOfTTests
     }
 
     [Fact]
-    public void Ctor_ShouldCreateFailureResult()
+    public void Ctor_WithValue_ShouldCreateFailureResult()
     {
         // Arrange
         var exception = new Exception();
@@ -90,23 +90,104 @@ public class ResultOfTTests
     }
 
     [Fact]
-    public void Or_ShouldThrowWhenUninitialized()
+    public void Ctor_WithResult_ShouldBeUninitializedIfGivenUninitialized()
     {
         // Arrange
-        Result<int> result = default;
-        var fakeAction = A.Fake<Func<Exception, int>>();
-
-        Action act = () => _ = result.Or(42);
-        Action act2 = () => _ = result.Or(fakeAction);
+        Result<Result<int>> input = default;
 
         // Assert
-        act.ShouldThrow<InvalidOperationException>();
-        act2.ShouldThrow<InvalidOperationException>();
-        A.CallTo(fakeAction).MustNotHaveHappened();
+        var result = new Result<int>(in input);
+
+        // Assert
+        result.IsDefault.ShouldBeTrue();
+        result.IsSuccessful.ShouldBeFalse();
+        result.IsFailure.ShouldBeFalse();
+        result.HasValue.ShouldBeFalse();
     }
 
     [Fact]
-    public void Or_ShouldReturnGivenValueWhenNotSuccessful()
+    public void Ctor_WithResult_ShouldCreateFailureWhenGivenFailure()
+    {
+        // Arrange
+        var exception = new Exception();
+        var input = new Result<Result<int>>(ExceptionDispatchInfo.Capture(exception));
+
+        // Act
+        var result = new Result<int>(in input);
+
+        // Assert
+        result.IsDefault.ShouldBeFalse();
+        result.IsSuccessful.ShouldBeFalse();
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldNotBeNull();
+        result.Error.ShouldBeSameAs(exception);
+    }
+
+    [Fact]
+    public void Ctor_WithResult_ShouldBeUninitializedWhenValueIsUninitialized()
+    {
+        // Arrange
+        Result<Result<int>> input = new(default(Result<int>));
+
+        // Assert
+        var result = new Result<int>(in input);
+
+        // Assert
+        result.IsDefault.ShouldBeTrue();
+        result.IsSuccessful.ShouldBeFalse();
+        result.IsFailure.ShouldBeFalse();
+        result.HasValue.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Ctor_WithResult_ShouldCreateFailureWhenValueIsFailure()
+    {
+        // Arrange
+        var exception = new Exception();
+        var input = new Result<Result<int>>(new Result<int>(ExceptionDispatchInfo.Capture(exception)));
+
+        // Act
+        var result = new Result<int>(in input);
+
+        // Assert
+        result.IsDefault.ShouldBeFalse();
+        result.IsSuccessful.ShouldBeFalse();
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldNotBeNull();
+        result.Error.ShouldBeSameAs(exception);
+    }
+
+    [Fact]
+    public void Ctor_WithResult_ShouldCreateSuccessfulWhenValueIsSuccessful()
+    {
+        // Arrange
+        var input = new Result<Result<int>>(new Result<int>(42));
+
+        // Act
+        var result = new Result<int>(in input);
+
+        // Assert
+        result.IsDefault.ShouldBeFalse();
+        result.IsSuccessful.ShouldBeTrue();
+        result.IsFailure.ShouldBeFalse();
+        result.HasValue.ShouldBeTrue();
+        result.Value.ShouldBe(42);
+        result.ValueRef.ShouldBe(42);
+    }
+
+    [Fact]
+    public void Or_WithAlternative_ShouldThrowWhenUninitialized()
+    {
+        // Arrange
+        Result<int> result = default;
+        Action act = () => _ = result.Or(42);
+
+        // Assert
+        act.ShouldThrow<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void Or_WithAlternative_ShouldReturnGivenAlternativeWhenNotSuccessful()
     {
         // Arrange
         var result = new Result<int>(ExceptionDispatchInfo.Capture(new Exception()));
@@ -121,24 +202,21 @@ public class ResultOfTTests
     }
 
     [Fact]
-    public void Or_ShouldReturnValueWhenSuccessful()
+    public void Or_WithAlternative_ShouldReturnValueWhenSuccessful()
     {
         // Arrange
-        var result = new Result<int>(42);
-        var fakeAction = A.Fake<Func<Exception, int>>();
+        var input = new Result<int>(42);
 
         // Act
-        var result2 = result.Or(12);
-        _ = result.Or(fakeAction);
+        var result = input.Or(12);
 
         // Assert
-        result.IsSuccessful.ShouldBeTrue();
-        result2.Value.ShouldBe(42);
-        A.CallTo(fakeAction).MustNotHaveHappened();
+        input.IsSuccessful.ShouldBeTrue();
+        result.Value.ShouldBe(42);
     }
 
     [Fact]
-    public void Or_ShouldThrowWhenGivenNullFactory()
+    public void Or_WithFactory_ShouldThrowWhenGivenNullFactory()
     {
         // Arrange
         var result = new Result<int>(ExceptionDispatchInfo.Capture(new Exception()));
@@ -149,22 +227,58 @@ public class ResultOfTTests
     }
 
     [Fact]
-    public void Or_ShouldReturnActionResultWhenNotSuccessful()
+    public void Or_WithFactory_ShouldThrowWhenUninitialized()
     {
         // Arrange
-        var input = new Result<int>(ExceptionDispatchInfo.Capture(new Exception()));
-
-        // Act
-        var result = input.Or(_ => 42);
+        Result<int> result = default;
+        var fakeAction = A.Fake<Func<Exception, int>>();
+        Action act = () => _ = result.Or(fakeAction);
 
         // Assert
+        act.ShouldThrow<InvalidOperationException>();
+        A.CallTo(fakeAction).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public void Or_WithFactory_ShouldReturnValueWhenSuccessful()
+    {
+        // Arrange
+        var input = new Result<int>(42);
+        var fakeAction = A.Fake<Func<Exception, int>>();
+
+        A.CallTo(() => fakeAction(A<Exception>._)).Returns(12);
+
+        // Act
+        var result = input.Or(fakeAction);
+
+        // Assert
+        A.CallTo(fakeAction).MustNotHaveHappened();
         result.IsSuccessful.ShouldBeTrue();
         result.IsFailure.ShouldBeFalse();
         result.Value.ShouldBe(42);
     }
 
     [Fact]
-    public void Or_ShouldHandleExceptionThrownByAction()
+    public void Or_WithFactory_ShouldReturnFactoryResultWhenNotSuccessful()
+    {
+        // Arrange
+        var input = new Result<int>(ExceptionDispatchInfo.Capture(new Exception()));
+        var fakeAction = A.Fake<Func<Exception, int>>();
+
+        A.CallTo(() => fakeAction(A<Exception>._)).Returns(42);
+
+        // Act
+        var result = input.Or(fakeAction);
+
+        // Assert
+        A.CallTo(fakeAction).MustHaveHappenedOnceExactly();
+        result.IsSuccessful.ShouldBeTrue();
+        result.IsFailure.ShouldBeFalse();
+        result.Value.ShouldBe(42);
+    }
+
+    [Fact]
+    public void Or_WithFactory_ShouldHandleExceptionThrownByAction()
     {
         // Arrange
         var exception = new Exception();
@@ -186,10 +300,101 @@ public class ResultOfTTests
     }
 
     [Fact]
-    public void OrElse_ShouldReturnAlternativeWhenUninitialized()
+    public async Task OrAsync_ShouldThrowWhenGivenNullFactory()
     {
         // Arrange
-        var input = default(Result<int>);
+        var result = new Result<int>();
+        Func<Task> act = () => result.OrAsync(null!, CancellationToken.None).AsTask();
+
+        // Assert
+        await act.ShouldThrowAsync<ArgumentNullException>();
+    }
+
+    [Fact]
+    public async Task OrAsync_ShouldThrowWhenUninitialized()
+    {
+        // Arrange
+        Result<int> result = default;
+        var fakeAction = A.Fake<Func<Exception, CancellationToken, Task<int>>>();
+        Func<Task> act = () => result.OrAsync(fakeAction).AsTask();
+
+        // Assert
+        await act.ShouldThrowAsync<InvalidOperationException>();
+        A.CallTo(fakeAction).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public async Task OrAsync_ShouldReturnValueWhenSuccessful()
+    {
+        // Arrange
+        var input = new Result<int>(42);
+        var fakeAction = A.Fake<Func<Exception, CancellationToken, Task<int>>>();
+
+        // Act
+        var result = await input.OrAsync(fakeAction);
+
+        // Assert
+        A.CallTo(fakeAction).MustNotHaveHappened();
+        result.IsSuccessful.ShouldBeTrue();
+        result.Value.ShouldBe(42);
+    }
+
+    [Fact]
+    public async Task OrAsync_ShouldReturnFactoryResultWhenNotSuccessful()
+    {
+        // Arrange
+        var input = new Result<int>(ExceptionDispatchInfo.Capture(new Exception()));
+        var fakeAction = A.Fake<Func<Exception, CancellationToken, Task<int>>>();
+
+        A.CallTo(() => fakeAction(A<Exception>._, A<CancellationToken>._)).Returns(42);
+
+        // Act
+        var result = await input.OrAsync(fakeAction);
+
+        // Assert
+        A.CallTo(fakeAction).MustHaveHappenedOnceExactly();
+        result.IsSuccessful.ShouldBeTrue();
+        result.Value.ShouldBe(42);
+    }
+
+    [Fact]
+    public async Task OrAsync_ShouldHandleExceptionThrownByAction()
+    {
+        // Arrange
+        var exception = new Exception();
+        var exception2 = new Exception();
+
+        var input = new Result<int>(ExceptionDispatchInfo.Capture(exception));
+        var fakeAction = A.Fake<Func<Exception, CancellationToken, Task<int>>>();
+        A.CallTo(fakeAction).Throws(exception2);
+
+        // Act
+        var result = await input.OrAsync(fakeAction);
+
+        // Assert
+        result.IsSuccessful.ShouldBeFalse();
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldNotBeNull();
+        result.Error.ShouldBeSameAs(exception2);
+        result.Error.ShouldNotBeSameAs(exception);
+    }
+
+    [Fact]
+    public void OrElse_WithAlternative_ShouldThrowWhenUninitialized()
+    {
+        // Arrange
+        Result<int> result = default;
+        Action act = () => _ = result.OrElse(new Result<int>(42));
+
+        // Assert
+        act.ShouldThrow<InvalidOperationException>();
+    }
+
+    [Fact]
+    public void OrElse_WithAlternative_ShouldReturnAlternativeWhenFailure()
+    {
+        // Arrange
+        var input = new Result<int>(ExceptionDispatchInfo.Capture(new Exception()));
         var alternative = new Result<int>(42);
 
         // Act
@@ -202,23 +407,7 @@ public class ResultOfTTests
     }
 
     [Fact]
-    public void OrElse_ShouldReturnAlternativeWhenFailure()
-    {
-        // Arrange
-        var input = new Result<int>(ExceptionDispatchInfo.Capture(new Exception()));;
-        var alternative = new Result<int>(42);
-
-        // Act
-        var result = input.OrElse(alternative);
-
-        // Assert
-        result.IsSuccessful.ShouldBeTrue();
-        result.IsFailure.ShouldBeFalse();
-        result.Value.ShouldBe(42);
-    }
-
-    [Fact]
-    public void OrElse_ShouldReturnOriginalWhenSuccessful()
+    public void OrElse_WithAlternative_ShouldReturnOriginalWhenSuccessful()
     {
         // Arrange
         var input = new Result<int>(42);
@@ -234,7 +423,7 @@ public class ResultOfTTests
     }
 
     [Fact]
-    public void OrElse_ShouldThrowWhenGivenNullFactory()
+    public void OrElse_WithFactory_ShouldThrowWhenGivenNullFactory()
     {
         // Arrange
         var result = new Result<int>();
@@ -245,55 +434,70 @@ public class ResultOfTTests
     }
 
     [Fact]
-    public void OrElse_ShouldNotCallFactoryWhenSuccessful()
+    public void OrElse_WithFactory_ShouldThrowWhenUninitialized()
+    {
+        // Arrange
+        Result<int> result = default;
+        var fakeAction = A.Fake<Func<Exception, Result<int>>>();
+
+        Action act = () => _ = result.OrElse(fakeAction);
+
+        // Assert
+        act.ShouldThrow<InvalidOperationException>();
+        A.CallTo(fakeAction).MustNotHaveHappened();
+    }
+
+    [Fact]
+    public void OrElse_WithFactory_ShouldNotCallFactoryWhenSuccessful()
     {
         // Arrange
         var input = new Result<int>(42);
-        var fakeAlternative = A.Fake<Func<Result<int>>>();
+        var fakeAction = A.Fake<Func<Exception, Result<int>>>();
 
         // Act
-        var result = input.OrElse(fakeAlternative);
+        var result = input.OrElse(fakeAction);
 
         // Assert
-        A.CallTo(fakeAlternative).MustNotHaveHappened();
+        A.CallTo(fakeAction).MustNotHaveHappened();
         result.IsSuccessful.ShouldBeTrue();
         result.IsFailure.ShouldBeFalse();
         result.Value.ShouldBe(42);
     }
 
     [Fact]
-    public void OrElse_ShouldCallFactoryWhenUnsuccessful()
+    public void OrElse_WithFactory_ShouldCallFactoryWhenUnsuccessful()
     {
         // Arrange
         var input = new Result<int>(ExceptionDispatchInfo.Capture(new Exception()));
-        var fakeAlternative = A.Fake<Func<Result<int>>>();
-        A.CallTo(() => fakeAlternative()).Returns(new Result<int>(42));
+        var fakeAction = A.Fake<Func<Exception, Result<int>>>();
+        A.CallTo(() => fakeAction(A<Exception>._)).Returns(new Result<int>(42));
 
         // Act
-        var result = input.OrElse(fakeAlternative);
+        var result = input.OrElse(fakeAction);
 
         // Assert
-        A.CallTo(fakeAlternative).MustHaveHappenedOnceExactly();
+        A.CallTo(fakeAction).MustHaveHappenedOnceExactly();
         result.IsSuccessful.ShouldBeTrue();
         result.IsFailure.ShouldBeFalse();
         result.Value.ShouldBe(42);
     }
 
     [Fact]
-    public void OrElse_ShouldHandleExceptionThrownByFactory()
+    public void OrElse_WithFactory_ShouldHandleExceptionThrownByFactory()
     {
         // Arrange
         var exception = new Exception();
         var exception2 = new Exception();
 
         var input = new Result<int>(ExceptionDispatchInfo.Capture(exception));
-        var fakeAlternative = A.Fake<Func<Result<int>>>();
-        A.CallTo(fakeAlternative).Throws(exception2);
+        var fakeAction = A.Fake<Func<Exception, Result<int>>>();
+        A.CallTo(fakeAction).Throws(exception2);
 
         // Act
-        var result = input.OrElse(fakeAlternative);
+        var result = input.OrElse(fakeAction);
 
         // Assert
+        A.CallTo(fakeAction).MustHaveHappenedOnceExactly();
         result.IsSuccessful.ShouldBeFalse();
         result.IsFailure.ShouldBeTrue();
         result.Error.ShouldNotBeNull();
@@ -302,370 +506,86 @@ public class ResultOfTTests
     }
 
     [Fact]
-    public void OnSuccess_ShouldThrowWhenUninitialized()
-    {
-        // Arrange
-        Result<int> result = default;
-        var fakeAction = A.Fake<Action<int>>();
-
-        Action act = () => result.OnSuccess(fakeAction);
-
-        // Assert
-        act.ShouldThrow<InvalidOperationException>();
-        A.CallTo(fakeAction).MustNotHaveHappened();
-    }
-
-    [Fact]
-    public void OnSuccess_ShouldThrowWhenGivenANullAction()
-    {
-        // Arrange
-        var result = new Result<int>(42);
-        Action act = () => result.OnSuccess(null!);
-
-        // Assert
-        act.ShouldThrow<ArgumentNullException>();
-    }
-
-    [Fact]
-    public void OnSuccess_ShouldCallActionOnceWhenSuccessful()
-    {
-        // Arrange
-        var result = new Result<int>(42);
-        var fakeAction = A.Fake<Action<int>>();
-
-        // Act
-        result.OnSuccess(fakeAction);
-
-        // Assert
-        A.CallTo(fakeAction).MustHaveHappenedOnceExactly();
-    }
-
-    [Fact]
-    public void OnSuccess_ShouldNotCallActionWhenNotSuccessful()
-    {
-        // Arrange
-        var result = new Result<int>(ExceptionDispatchInfo.Capture(new Exception()));
-        var fakeAction = A.Fake<Action<int>>();
-
-        // Act
-        result.OnSuccess(fakeAction);
-
-        // Assert
-        A.CallTo(fakeAction).MustNotHaveHappened();
-    }
-
-    [Fact]
-    public void OnFailure_ShouldThrowWhenUninitialized()
-    {
-        // Arrange
-        Result<int> result = default;
-        var fakeAction = A.Fake<Action<Exception>>();
-
-        Action act = () => result.OnFailure(fakeAction);
-
-        // Assert
-        act.ShouldThrow<InvalidOperationException>();
-        A.CallTo(fakeAction).MustNotHaveHappened();
-    }
-
-    [Fact]
-    public void OnFailure_ShouldThrowWhenGivenANullAction()
-    {
-        // Arrange
-        var result = new Result<int>(42);
-        Action act = () => result.OnFailure(null!);
-
-        // Assert
-        act.ShouldThrow<ArgumentNullException>();
-    }
-
-    [Fact]
-    public void OnFailure_ShouldCallActionWhenNotSuccessful()
-    {
-        // Arrange
-        var result = new Result<int>(ExceptionDispatchInfo.Capture(new Exception()));
-        var fakeAction = A.Fake<Action<Exception>>();
-
-        // Act
-        result.OnFailure(fakeAction);
-
-        // Assert
-        A.CallTo(fakeAction).MustHaveHappenedOnceExactly();
-    }
-
-    [Fact]
-    public void OnFailure_ShouldNotCallActionOnceWhenSuccessful()
-    {
-        // Arrange
-        var result = new Result<int>(42);
-        var fakeAction = A.Fake<Action<Exception>>();
-
-        // Act
-        result.OnFailure(fakeAction);
-
-        // Assert
-        A.CallTo(fakeAction).MustNotHaveHappened();
-    }
-
-    [Fact]
-    public void Match_ShouldThrowWhenGivenNullOnSuccessCallback()
+    public async Task OrElseAsync_ShouldThrowWhenGivenNullFactory()
     {
         // Arrange
         var result = new Result<int>();
-        Action act = () => result.Match(null!, null!);
-
-        // Assert
-        act.ShouldThrow<ArgumentNullException>();
-    }
-
-    [Fact]
-    public void Match_ShouldThrowWhenGivenNullOnFailureCallback()
-    {
-        // Arrange
-        var result = new Result<int>();
-        var fakeOnSuccess = A.Fake<Action<int>>();
-        Action act = () => result.Match(fakeOnSuccess, null!);
-
-        // Assert
-        act.ShouldThrow<ArgumentNullException>();
-        A.CallTo(fakeOnSuccess).MustNotHaveHappened();
-    }
-
-    [Fact]
-    public void Match_ShouldCallOnSuccessWhenSuccessful()
-    {
-        // Arrange
-        var result = new Result<int>(42);
-        var fakeOnSuccess = A.Fake<Action<int>>();
-        var fakeOnFailure = A.Fake<Action<Exception>>();
-
-        // Act
-        result.Match(fakeOnSuccess, fakeOnFailure);
-
-        // Assert
-        A.CallTo(fakeOnSuccess).MustHaveHappenedOnceExactly();
-        A.CallTo(fakeOnFailure).MustNotHaveHappened();
-    }
-
-    [Fact]
-    public void Match_ShouldCallOnFailureWhenNotSuccessful()
-    {
-        // Arrange
-        var result = new Result<int>(ExceptionDispatchInfo.Capture(new Exception()));
-        var fakeOnSuccess = A.Fake<Action<int>>();
-        var fakeOnFailure = A.Fake<Action<Exception>>();
-
-        // Act
-        result.Match(fakeOnSuccess, fakeOnFailure);
-
-        // Assert
-        A.CallTo(fakeOnSuccess).MustNotHaveHappened();
-        A.CallTo(fakeOnFailure).MustHaveHappenedOnceExactly();
-    }
-
-    [Fact]
-    public async Task MatchAsync_ShouldThrowWhenGivenNullOnSuccessCallback()
-    {
-        // Arrange
-        var result = new Result<int>();
-        Func<Task> act = () => result.MatchAsync(null!, null!, CancellationToken.None).AsTask();
+        Func<Task> act = () => result.OrElseAsync(null!).AsTask();
 
         // Assert
         await act.ShouldThrowAsync<ArgumentNullException>();
     }
 
     [Fact]
-    public async Task MatchAsync_ShouldThrowWhenGivenNullOnFailureCallback()
-    {
-        // Arrange
-        var result = new Result<int>();
-        var fakeOnSuccess = A.Fake<Func<int, CancellationToken, Task>>();
-        Func<Task> act = () => result.MatchAsync(fakeOnSuccess, null!, CancellationToken.None).AsTask();
-
-        // Assert
-        await act.ShouldThrowAsync<ArgumentNullException>();
-        A.CallTo(fakeOnSuccess).MustNotHaveHappened();
-    }
-
-    [Fact]
-    public async Task MatchAsync_ShouldCallOnSuccessWhenSuccessful()
-    {
-        // Arrange
-        var result = new Result<int>(42);
-        var fakeOnSuccess = A.Fake<Func<int, CancellationToken, Task>>();
-        var fakeOnFailure = A.Fake<Func<Exception, CancellationToken, Task>>();
-
-        // Act
-        await result.MatchAsync(fakeOnSuccess, fakeOnFailure, CancellationToken.None);
-
-        // Assert
-        A.CallTo(fakeOnSuccess).MustHaveHappenedOnceExactly();
-        A.CallTo(fakeOnFailure).MustNotHaveHappened();
-    }
-
-    [Fact]
-    public async Task MatchAsync_ShouldCallOnFailureWhenNotSuccessful()
-    {
-        // Arrange
-        var result = new Result<int>(ExceptionDispatchInfo.Capture(new Exception()));
-        var fakeOnSuccess = A.Fake<Func<int, CancellationToken, Task>>();
-        var fakeOnFailure = A.Fake<Func<Exception, CancellationToken, Task>>();
-
-        // Act
-        await result.MatchAsync(fakeOnSuccess, fakeOnFailure, CancellationToken.None);
-
-        // Assert
-        A.CallTo(fakeOnSuccess).MustNotHaveHappened();
-        A.CallTo(fakeOnFailure).MustHaveHappenedOnceExactly();
-    }
-
-    [Fact]
-    public void Fold_ShouldThrowWhenUninitialized()
+    public async Task OrElseAsync_ShouldThrowWhenUninitialized()
     {
         // Arrange
         Result<int> result = default;
-        var successFakeAction = A.Fake<Func<int, int>>();
-        var failureFakeAction = A.Fake<Func<Exception, int>>();
+        var fakeAction = A.Fake<Func<Exception, CancellationToken, Task<Result<int>>>>();
 
-        Action act = () => _ = result.Fold(successFakeAction, failureFakeAction);
-
-        // Assert
-        act.ShouldThrow<InvalidOperationException>();
-        A.CallTo(successFakeAction).MustNotHaveHappened();
-        A.CallTo(failureFakeAction).MustNotHaveHappened();
-    }
-
-    [Fact]
-    public void Fold_ShouldThrowWhenGivenNullSuccessAction()
-    {
-        // Arrange
-        var result = new Result<int>(42);
-        Action act = () => _ = result.Fold(null!, A.Fake<Func<Exception, int>>());
-
-        // Assert
-        act.ShouldThrow<ArgumentNullException>();
-    }
-
-    [Fact]
-    public void Fold_ShouldThrowWhenGivenNullFailAction()
-    {
-        // Arrange
-        var result = new Result<int>(42);
-        Action act = () => _ = result.Fold(A.Fake<Func<int, int>>(), null!);
-
-        // Assert
-        act.ShouldThrow<ArgumentNullException>();
-    }
-
-    [Fact]
-    public void Fold_ShouldCallSuccessActionWhenSuccessful()
-    {
-        // Arrange
-        var result = new Result<int>(42);
-        var successFakeAction = A.Fake<Func<int, int>>();
-        var failureFakeAction = A.Fake<Func<Exception, int>>();
-
-        // Act
-        _ = result.Fold(successFakeAction, failureFakeAction);
-
-        // Assert
-        A.CallTo(successFakeAction).MustHaveHappenedOnceExactly();
-        A.CallTo(failureFakeAction).MustNotHaveHappened();
-    }
-
-    [Fact]
-    public void Fold_ShouldCallFailActionWhenNotSuccessful()
-    {
-        // Arrange
-        var exception = new Exception();
-        var result = new Result<int>(ExceptionDispatchInfo.Capture(exception));
-        var successFakeAction = A.Fake<Func<int, int>>();
-        var failureFakeAction = A.Fake<Func<Exception, int>>();
-
-        // Act
-        _ = result.Fold(successFakeAction, failureFakeAction);
-
-        // Assert
-        A.CallTo(successFakeAction).MustNotHaveHappened();
-        A.CallTo(failureFakeAction).MustHaveHappenedOnceExactly();
-    }
-
-    [Fact]
-    public async Task FoldAsync_ShouldThrowWhenUninitialized()
-    {
-        // Arrange
-        Result<int> result = default;
-        var successFakeAction = A.Fake<Func<int, CancellationToken, Task<int>>>();
-        var failureFakeAction = A.Fake<Func<Exception, CancellationToken, Task<int>>>();
-
-        Func<Task<int>> act = async () => _ = await result.FoldAsync(
-            successFakeAction,
-            failureFakeAction
-        );
+        Func<Task> act = () => _ = result.OrElseAsync(fakeAction).AsTask();
 
         // Assert
         await act.ShouldThrowAsync<InvalidOperationException>();
-        A.CallTo(successFakeAction).MustNotHaveHappened();
-        A.CallTo(failureFakeAction).MustNotHaveHappened();
+        A.CallTo(fakeAction).MustNotHaveHappened();
     }
 
     [Fact]
-    public async Task FoldAsync_ShouldThrowWhenGivenNullSuccessAction()
+    public async Task OrElseAsync_ShouldNotCallFactoryWhenSuccessful()
     {
         // Arrange
-        var result = new Result<int>(42);
-        var fakeFailureAction = A.Fake<Func<Exception, CancellationToken, Task<int>>>();
-        var act = () => result.FoldAsync(null!, fakeFailureAction);
-
-        // Assert
-        await act.ShouldThrowAsync<ArgumentNullException>();
-        A.CallTo(fakeFailureAction).MustNotHaveHappened();
-    }
-
-    [Fact]
-    public async Task FoldAsync_ShouldThrowWhenGivenNullFailAction()
-    {
-        // Arrange
-        var result = new Result<int>(42);
-        var fakeSuccessAction = A.Fake<Func<int, CancellationToken, Task<int>>>();
-        var act = () => result.FoldAsync(fakeSuccessAction, null!);
-
-        // Assert
-        await act.ShouldThrowAsync<ArgumentNullException>();
-        A.CallTo(fakeSuccessAction).MustNotHaveHappened();
-    }
-
-    [Fact]
-    public async Task FoldAsync_ShouldCallSuccessActionWhenSuccessful()
-    {
-        // Arrange
-        var result = new Result<int>(42);
-        var successFakeAction = A.Fake<Func<int, CancellationToken, Task<int>>>();
-        var failureFakeAction = A.Fake<Func<Exception, CancellationToken, Task<int>>>();
+        var input = new Result<int>(42);
+        var fakeAction = A.Fake<Func<Exception, CancellationToken, Task<Result<int>>>>();
 
         // Act
-        _ = await result.FoldAsync(successFakeAction, failureFakeAction);
+        var result = await input.OrElseAsync(fakeAction);
 
         // Assert
-        A.CallTo(successFakeAction).MustHaveHappenedOnceExactly();
-        A.CallTo(failureFakeAction).MustNotHaveHappened();
+        A.CallTo(fakeAction).MustNotHaveHappened();
+        result.IsSuccessful.ShouldBeTrue();
+        result.IsFailure.ShouldBeFalse();
+        result.Value.ShouldBe(42);
     }
 
     [Fact]
-    public async Task FoldAsync_ShouldCallFailureActionWhenNotSuccessful()
+    public async Task OrElseAsync_ShouldCallFactoryWhenUnsuccessful()
+    {
+        // Arrange
+        var input = new Result<int>(ExceptionDispatchInfo.Capture(new Exception()));
+        var fakeAction = A.Fake<Func<Exception, CancellationToken, Task<Result<int>>>>();
+        A.CallTo(() => fakeAction(A<Exception>._, A<CancellationToken>._)).Returns(new Result<int>(42));
+
+        // Act
+        var result = await input.OrElseAsync(fakeAction);
+
+        // Assert
+        A.CallTo(fakeAction).MustHaveHappenedOnceExactly();
+        result.IsSuccessful.ShouldBeTrue();
+        result.IsFailure.ShouldBeFalse();
+        result.Value.ShouldBe(42);
+    }
+
+    [Fact]
+    public async Task OrElseAsync_ShouldHandleExceptionThrownByFactory()
     {
         // Arrange
         var exception = new Exception();
-        var result = new Result<int>(ExceptionDispatchInfo.Capture(exception));
-        var successFakeAction = A.Fake<Func<int, CancellationToken, Task<int>>>();
-        var failureFakeAction = A.Fake<Func<Exception, CancellationToken, Task<int>>>();
+        var exception2 = new Exception();
+
+        var input = new Result<int>(ExceptionDispatchInfo.Capture(exception));
+        var fakeAction = A.Fake<Func<Exception, CancellationToken, Task<Result<int>>>>();
+        A.CallTo(fakeAction).Throws(exception2);
 
         // Act
-        _ = await result.FoldAsync(successFakeAction, failureFakeAction);
+        var result = await input.OrElseAsync(fakeAction);
 
         // Assert
-        A.CallTo(successFakeAction).MustNotHaveHappened();
-        A.CallTo(failureFakeAction).MustHaveHappenedOnceExactly();
+        A.CallTo(fakeAction).MustHaveHappenedOnceExactly();
+        result.IsSuccessful.ShouldBeFalse();
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldNotBeNull();
+        result.Error.ShouldBeSameAs(exception2);
+        result.Error.ShouldNotBeSameAs(exception);
     }
 
     [Fact]
@@ -815,65 +735,111 @@ public class ResultOfTTests
     }
 
     [Fact]
-    public void LogicalNotOperator_SmokeTest()
+    public void LogicalNotOperator_ShouldReturnFalseWhenUninitialized()
     {
-        // Only failure should be `true`
-
         (!default(Result<int>)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void LogicalNotOperator_ShouldReturnFalseWhenSuccessful()
+    {
         (!new Result<int>()).ShouldBeFalse();
+        (!new Result<int>(42)).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void LogicalNotOperator_ShouldReturnTrueWhenUnsuccessful()
+    {
         (!new Result<int>(ExceptionDispatchInfo.Capture(new Exception()))).ShouldBeTrue();
     }
 
     [Fact]
-    public void TrueOperator_SmokeTest()
+    public void TrueOperator_ShouldReturnFalseWhenUninitialized()
     {
-        Result<int> result = default;
-        if (result)
+        if (default(Result<int>))
         {
-            throw new Exception("Default result should return false");
+            throw new Exception("Default result should not be true");
         }
+    }
 
-        result = new Result<int>();
-        if (result)
+    [Fact]
+    public void TrueOperator_ShouldReturnTrueWhenSuccessful()
+    {
+        if (new Result<int>())
         {
             // ignore
         }
         else
         {
-            throw new Exception("Successful result should return true");
+            throw new Exception("Successful result should be true");
         }
+    }
 
-        result = new Result<int>(ExceptionDispatchInfo.Capture(new Exception()));
-        if (result)
+    [Fact]
+    public void TrueOperator_ShouldReturnFalseWhenUnsuccessful()
+    {
+        if (new Result<int>(ExceptionDispatchInfo.Capture(new Exception())))
         {
-            throw new Exception("Failure result should return false");
+            throw new Exception("Unsuccessful result should not be true");
         }
     }
 
     [Fact]
-    public void BitwiseAndOperator_SmokeTest()
+    public void BitwiseAndOperator_ShouldReturnFalseWhenEitherIsUninitializedOrUnsuccessful()
     {
-        // Only two successes should be `true`
+        var unsuccessful = new Result<int>(ExceptionDispatchInfo.Capture(new Exception()));
 
-        (default(Result<int>) & default(Result<int>)).ShouldBeFalse();
         (default(Result<int>) & new Result<int>()).ShouldBeFalse();
-        (new Result<int>() & new Result<int>()).ShouldBeTrue();
-        (default(Result<int>) & new Result<int>(ExceptionDispatchInfo.Capture(new Exception()))).ShouldBeFalse();
-        (
-            new Result<int>(ExceptionDispatchInfo.Capture(new Exception())) &
-            new Result<int>(ExceptionDispatchInfo.Capture(new Exception()))
-        ).ShouldBeFalse();
+        (new Result<int>() & default(Result<int>)).ShouldBeFalse();
+        (unsuccessful & new Result<int>()).ShouldBeFalse();
+        (new Result<int>() & unsuccessful).ShouldBeFalse();
     }
 
     [Fact]
-    public void BitwiseOrOperator_SmokeTest()
+    public void BitwiseAndOperator_ShouldReturnTrueWhenBothAreSuccessful()
     {
-        (default(Result<int>) | 42).ShouldBe(42);
-        (default(Result<int>) | new Result<int>(42)).Value.ShouldBe(42);
-        (new Result<int>(42) | default(Result<int>)).Value.ShouldBe(42);
-        (new Result<int>() | new Result<int>(42)).Value.ShouldBe(0);
-        (new Result<int>(ExceptionDispatchInfo.Capture(new Exception())) | 42).ShouldBe(42);
-        (new Result<int>(ExceptionDispatchInfo.Capture(new Exception())) | new Result<int>(42)).Value.ShouldBe(42);
-        (new Result<int>(42) | new Result<int>(ExceptionDispatchInfo.Capture(new Exception()))).Value.ShouldBe(42);
+        (new Result<int>() & new Result<int>()).ShouldBeTrue();
+        (new Result<int>() & new Result<int>(42)).ShouldBeTrue();
+        (new Result<int>(42) & new Result<int>()).ShouldBeTrue();
+        (new Result<int>(42) & new Result<int>(42)).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void BitwiseOrOperator_ShouldReturnAlternativeWhenUninitialized()
+    {
+        // Act
+        var result = default(Result<int>) | new Result<int>(42);
+
+        // Assert
+        result.IsDefault.ShouldBeFalse();
+        result.IsSuccessful.ShouldBeTrue();
+        result.IsFailure.ShouldBeFalse();
+        result.Value.ShouldBe(42);
+    }
+
+    [Fact]
+    public void BitwiseOrOperator_ShouldReturnAlternativeWhenUnsuccessful()
+    {
+        // Act
+        var result = new Result<int>(ExceptionDispatchInfo.Capture(new Exception())) | new Result<int>(42);
+
+        // Assert
+        result.IsDefault.ShouldBeFalse();
+        result.IsSuccessful.ShouldBeTrue();
+        result.IsFailure.ShouldBeFalse();
+        result.Value.ShouldBe(42);
+    }
+
+    [Fact]
+    public void BitwiseOrOperator_ShouldReturnSelfWhenSuccessful()
+    {
+        // Act
+        var result = new Result<int>(42) | new Result<int>(100);
+
+        // Assert
+        result.IsDefault.ShouldBeFalse();
+        result.IsSuccessful.ShouldBeTrue();
+        result.IsFailure.ShouldBeFalse();
+        result.Value.ShouldBe(42);
     }
 }

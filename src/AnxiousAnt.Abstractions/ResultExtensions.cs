@@ -28,9 +28,23 @@ public static class ResultExtensions
     /// <returns>
     /// The flatten <see cref="Result{T}"/>.
     /// </returns>
-    [Pure]
+    [Pure, ExcludeFromCodeCoverage]
     public static Result<T> Flatten<T>(this in Result<Result<T>> result) where T : notnull =>
         new(in result);
+
+    /// <summary>
+    /// Converts a task returning a value of type <typeparamref name="T"/> into a wrapped <see cref="Result{T}"/>
+    /// asynchronously.
+    /// </summary>
+    /// <typeparam name="T">The type of the underlying value.</typeparam>
+    /// <param name="task">The task to convert to a <see cref="Result{T}"/>.</param>
+    /// <returns>
+    /// A task representing the asynchronous operation, containing a <see cref="Result{T}"/> with the result of
+    /// the original task.
+    /// </returns>
+    [ExcludeFromCodeCoverage]
+    public static Task<Result<T>> ToResultAsync<T>(this Task<T> task) where T : notnull =>
+        Result.FromTaskAsync(task).AsTask();
 
     /// <summary>
     /// Returns a reference to the value of the input <see cref="Result{T}"/> instance, regardless of whether the
@@ -93,6 +107,26 @@ public static class ResultExtensions
     }
 
     /// <summary>
+    /// Returns the current successful result if it exists; otherwise, invokes the specified factory
+    /// function to produce a new result.
+    /// </summary>
+    /// <typeparam name="T">The type of the underlying value.</typeparam>
+    /// <param name="result">The <see cref="Result{T}"/>.</param>
+    /// <param name="factory">A delegate that is invoked to produce a new <see cref="Result{T}"/> if the current
+    /// result is not successful.</param>
+    /// <returns>
+    /// A new result that is either the current successful result or the result produced by the factory function.
+    /// If an exception occurs while invoking the factory, a failure result containing the exception is returned.
+    /// </returns>
+    [Pure, ExcludeFromCodeCoverage]
+    public static ValueTask<Result<T>> OrAsync<T>(this in Result<T> result, Func<Exception, Task<T?>> factory)
+        where T : notnull
+    {
+        ArgumentNullException.ThrowIfNull(factory);
+        return result.OrAsync((error, _) => factory(error));
+    }
+
+    /// <summary>
     /// Returns the current <see cref="Result{T}"/> if it is successful; otherwise, invokes the specified factory and
     /// returns the result produced by the factory.
     /// </summary>
@@ -112,56 +146,45 @@ public static class ResultExtensions
     }
 
     /// <summary>
-    /// Asynchronously executes one of the provided actions depending on whether the result is successful
-    /// or a failure.
+    /// Asynchronously returns the current <see cref="Result{T}"/> if it is successful; otherwise, invokes the
+    /// specified factory and returns the result produced by the factory.
     /// </summary>
     /// <typeparam name="T">The type of the underlying value.</typeparam>
     /// <param name="result">The <see cref="Result{T}"/>.</param>
-    /// <param name="onSuccess">The action to execute when the result is successful.</param>
-    /// <param name="onFailure">The action to execute when the result is a failure.</param>
+    /// <param name="factory">A delegate that is invoked to produce a new <see cref="Result{T}"/> if the current
+    /// result is not successful.</param>
     /// <returns>
-    /// A task representing the asynchronous operation.
+    /// A task that resolves to the current result if it is successful, or the result returned by the factory
+    /// function in case of a failure.
     /// </returns>
-    public static ValueTask MatchAsync<T>(
-        this in Result<T> result,
-        Func<T, Task> onSuccess,
-        Func<Exception, Task> onFailure)
+    [Pure, ExcludeFromCodeCoverage]
+    public static ValueTask<Result<T>> OrElseAsync<T>(this in Result<T> result, Func<Task<Result<T>>> factory)
         where T : notnull
     {
-        ArgumentNullException.ThrowIfNull(onSuccess);
-        ArgumentNullException.ThrowIfNull(onFailure);
-
-        return result.MatchAsync((value, _) => onSuccess(value), (error, _) => onFailure(error));
+        ArgumentNullException.ThrowIfNull(factory);
+        return OrElseAsync(in result, _ => factory());
     }
 
     /// <summary>
-    /// Asynchronously transforms the result into another value based on the success or failure state.
+    /// Asynchronously returns the current <see cref="Result{T}"/> if it is successful; otherwise, invokes the
+    /// specified factory and returns the result produced by the factory.
     /// </summary>
     /// <typeparam name="T">The type of the underlying value.</typeparam>
-    /// <typeparam name="TOutput">The type of the transformed result.</typeparam>
     /// <param name="result">The <see cref="Result{T}"/>.</param>
-    /// <param name="onSuccess">A function to invoke if the result is successful, which returns a task that
-    /// produces a transformed value.</param>
-    /// <param name="onFailure">A function to invoke if the result is a failure, which returns a task that
-    /// produces a transformed value.</param>
+    /// <param name="factory">A delegate that is invoked to produce a new <see cref="Result{T}"/> if the current
+    /// result is not successful.</param>
     /// <returns>
-    /// A task representing the asynchronous operation. The result of the task is the transformed value.
+    /// A task that resolves to the current result if it is successful, or the result returned by the factory
+    /// function in case of a failure.
     /// </returns>
-    [Pure]
-    public static Task<TOutput> FoldAsync<T, TOutput>(
+    [Pure, ExcludeFromCodeCoverage]
+    public static ValueTask<Result<T>> OrElseAsync<T>(
         this in Result<T> result,
-        Func<T?, Task<TOutput>> onSuccess,
-        Func<Exception, Task<TOutput>> onFailure)
+        Func<Exception, Task<Result<T>>> factory)
         where T : notnull
-        where TOutput : notnull
     {
-        ArgumentNullException.ThrowIfNull(onSuccess);
-        ArgumentNullException.ThrowIfNull(onFailure);
-        return result.FoldAsync(
-            (v, _) => onSuccess(v),
-            (e, _) => onFailure(e),
-            CancellationToken.None
-        );
+        ArgumentNullException.ThrowIfNull(factory);
+        return result.OrElseAsync((error, _) => factory(error));
     }
 
     /// <summary>
@@ -177,7 +200,7 @@ public static class ResultExtensions
     /// <see cref="Result{TOutput}"/>.
     /// </returns>
     /// <exception cref="ArgumentNullException">Thrown when <paramref name="transform"/> is <c>null</c>.</exception>
-    [Pure]
+    [Pure, ExcludeFromCodeCoverage]
     public static ValueTask<Result<TOutput>> MapAsync<T, TOutput>(
         this in Result<T> result,
         Func<T?, Task<TOutput?>> transform)

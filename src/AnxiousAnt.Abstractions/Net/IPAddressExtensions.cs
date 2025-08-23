@@ -32,10 +32,7 @@ public static class IPAddressExtensions
         }
 
         using var owner = SpanOwner<byte>.Allocate(BytesToAllocate);
-        if (!address.TryWriteBytes(owner.Span, out var bytesWritten))
-        {
-            return address.ToString();
-        }
+        _ = address.TryWriteBytes(owner.Span, out _);
 
         var sb = StringBuilderPool.Rent();
         for (var i = 0; i < 8; i++)
@@ -62,15 +59,13 @@ public static class IPAddressExtensions
         ArgumentNullException.ThrowIfNull(address);
 
         using var owner = SpanOwner<byte>.Allocate(BytesToAllocate);
-        if (!address.TryWriteBytes(owner.Span, out var bytesWritten))
-        {
-        }
+        _ = address.TryWriteBytes(owner.Span, out var bytesWritten);
 
-        ulong result = 2166136261;
+        ulong result = 2166136261ul;
         for (var i = 0; i < bytesWritten; i++)
         {
             result ^= owner.Span[i];
-            result *= 16777619;
+            result *= 16777619ul;
         }
 
         return result;

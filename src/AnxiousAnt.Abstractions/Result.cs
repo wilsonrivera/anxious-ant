@@ -85,18 +85,18 @@ public static class Result
     /// Executes a specified function and returns a result encapsulating the outcome.
     /// </summary>
     /// <typeparam name="T">The type of the value associated with the result.</typeparam>
-    /// <param name="factory">The function to execute, which produces the value to encapsulate.</param>
+    /// <param name="action">The function to execute, which produces the value to encapsulate.</param>
     /// <returns>
     /// A <see cref="Result{T}"/> instance containing the value returned by the function
     /// if successful, or encapsulating the exception thrown during execution.
     /// </returns>
-    public static Result<T> Try<T>(Func<T> factory) where T : notnull
+    public static Result<T> Try<T>(Func<T> action) where T : notnull
     {
-        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentNullException.ThrowIfNull(action);
 
         try
         {
-            var result = factory();
+            var result = action();
             return FromValue(result);
         }
         catch (Exception e)
@@ -109,48 +109,46 @@ public static class Result
     /// Asynchronously executes a function and encapsulates the result or exception into a <see cref="Result{T}"/>.
     /// </summary>
     /// <typeparam name="T">The type of the value associated with the result.</typeparam>
-    /// <param name="factory">The asynchronous function to be executed.</param>
+    /// <param name="action">The asynchronous function to be executed.</param>
     /// <returns>
     /// A task producing a <see cref="Result{T}"/> which represents the result of the operation.
     /// </returns>
     [ExcludeFromCodeCoverage]
-    public static ValueTask<Result<T>> TryAsync<T>(Func<Task<T>> factory) where T : notnull
+    public static ValueTask<Result<T>> TryAsync<T>(Func<Task<T>> action) where T : notnull
     {
-        ArgumentNullException.ThrowIfNull(factory);
-        return TryAsync<T>(_ => factory(), CancellationToken.None);
+        ArgumentNullException.ThrowIfNull(action);
+        return TryAsync<T>(_ => action(), CancellationToken.None);
     }
 
     /// <summary>
     /// Asynchronously executes a function and encapsulates the result or exception into a <see cref="Result{T}"/>.
     /// </summary>
     /// <typeparam name="T">The type of the value associated with the result.</typeparam>
-    /// <param name="factory">The asynchronous function to be executed.</param>
+    /// <param name="action">The asynchronous function to be executed.</param>
     /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to
     /// complete.</param>
     /// <returns>
     /// A task producing a <see cref="Result{T}"/> which represents the result of the operation.
     /// </returns>
-    public static ValueTask<Result<T>> TryAsync<T>(
-        Func<CancellationToken, Task<T>> factory,
-        CancellationToken cancellationToken)
+    public static async ValueTask<Result<T>> TryAsync<T>(
+        Func<CancellationToken, Task<T>> action,
+        CancellationToken cancellationToken = default)
         where T : notnull
     {
-        ArgumentNullException.ThrowIfNull(factory);
+        ArgumentNullException.ThrowIfNull(action);
         if (cancellationToken.IsCancellationRequested)
         {
-            return ValueTask.FromResult(
-                FromException<T>(new OperationCanceledException(cancellationToken))
-            );
+            return FromException<T>(new OperationCanceledException(cancellationToken));
         }
 
         try
         {
-            var task = factory(cancellationToken);
-            return FromTaskAsync(task);
+            var task = action(cancellationToken);
+            return await FromTaskAsync(task).ConfigureAwait(false);
         }
         catch (Exception e)
         {
-            return ValueTask.FromResult(FromException<T>(e));
+            return FromException<T>(e);
         }
     }
 
@@ -163,8 +161,7 @@ public static class Result
     /// <returns>
     /// A <see cref="Result{T}"/> instance encapsulating the task's result or an error if the task failed.
     /// </returns>
-    public static async ValueTask<Result<T>> FromTaskAsync<T>(Task<T> task)
-        where T : notnull
+    public static async ValueTask<Result<T>> FromTaskAsync<T>(Task<T> task) where T : notnull
     {
         ArgumentNullException.ThrowIfNull(task);
 

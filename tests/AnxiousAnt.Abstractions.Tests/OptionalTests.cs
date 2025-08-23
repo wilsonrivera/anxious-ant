@@ -1,102 +1,105 @@
-using System.Runtime.ExceptionServices;
-
 namespace AnxiousAnt;
 
-public class ResultTests
+public class OptionalTests
 {
     [Fact]
-    public void FromValue_ShouldReturnSuccess()
-    {
-        // Arrange
-        var result = Result.FromValue(42);
-
-        // Assert
-        result.IsSuccessful.ShouldBeTrue();
-        result.Error.ShouldBeNull();
-    }
-
-    [Fact]
-    public void FromException_ShouldThrowWhenGivenNullException()
-    {
-        // Arrange
-        Action act = () => Result.FromException<int>((Exception)null!);
-
-        // Assert
-        act.ShouldThrow<ArgumentNullException>();
-    }
-
-    [Fact]
-    public void FromException_ShouldReturnFailureWhenGivenAnException()
-    {
-        // Arrange
-        var ex = new Exception();
-        var result = Result.FromException<int>(ex);
-
-        // Assert
-        result.IsSuccessful.ShouldBeFalse();
-        result.Error.ShouldNotBeNull();
-        result.Error.ShouldBeSameAs(ex);
-    }
-
-    [Fact]
-    public void FromException_ShouldThrowWhenGivenExceptionDispatchInfo()
-    {
-        // Arrange
-        Action act = () => Result.FromException<int>((ExceptionDispatchInfo)null!);
-
-        // Assert
-        act.ShouldThrow<ArgumentNullException>();
-    }
-
-    [Fact]
-    public void FromException_ShouldReturnFailureWhenGivenAnExceptionDispatchInfo()
-    {
-        // Arrange
-        var ex = new Exception();
-        var edi = ExceptionDispatchInfo.Capture(ex);
-        var result = Result.FromException<int>(edi);
-
-        // Assert
-        result.IsSuccessful.ShouldBeFalse();
-        result.Error.ShouldNotBeNull();
-        result.Error.ShouldBeSameAs(ex);
-    }
-
-    [Fact]
-    public void IsResult_ShouldThrowWhenGivenNull()
-    {
-        // Arrange
-        Action act = () => Result.IsResult(null!);
-
-        // Assert
-        act.ShouldThrow<ArgumentNullException>();
-    }
-
-    [Fact]
-    public void IsResult_ShouldReturnFalseWhenGivenUnboundResultType()
+    public void None_ShouldReturnOptionalWithNoValue()
     {
         // Act
-        var result = Result.IsResult(typeof(Result<>));
+        var optional = Optional.None<string>();
+
+        // Assert
+        optional.IsDefault.ShouldBeFalse();
+        optional.IsEmpty.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Of_ShouldThrowWhenGivenNull()
+    {
+        // Arrange
+        Action act = () => _ = Optional.Of<string>(null!);
+
+        // Assert
+        act.ShouldThrow<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void Of_ShouldReturnOptionalWithValue()
+    {
+        // Arrange
+        const string value = "test";
+
+        // Act
+        var optional = Optional.Of(value);
+
+        // Assert
+        optional.IsDefault.ShouldBeFalse();
+        optional.IsEmpty.ShouldBeFalse();
+        optional.Value.ShouldBeSameAs(value);
+    }
+
+    [Fact]
+    public void OfNullable_ShouldReturnOptionalWithNoValueWhenGivenNull()
+    {
+        // Act
+        var optional = Optional.OfNullable<string>(null);
+
+        // Assert
+        optional.IsDefault.ShouldBeFalse();
+        optional.IsEmpty.ShouldBeTrue();
+        optional.ValueKind.ShouldBe(Optional.NullValueKind);
+    }
+
+    [Fact]
+    public void OfNullable_ShouldReturnOptionalWithValue()
+    {
+        // Arrange
+        const string value = "test";
+
+        // Act
+        var optional = Optional.OfNullable(value);
+
+        // Assert
+        optional.IsDefault.ShouldBeFalse();
+        optional.IsEmpty.ShouldBeFalse();
+        optional.Value.ShouldBeSameAs(value);
+    }
+
+    [Fact]
+    public void IsOptional_ShouldThrowWhenGivenNull()
+    {
+        // Arrange
+        Action act = () => Optional.IsOptional(null!);
+
+        // Assert
+        act.ShouldThrow<ArgumentNullException>();
+    }
+
+    [Fact]
+    public void IsOptional_ShouldReturnFalseWhenGivenUnboundResultType()
+    {
+        // Act
+        var result = Optional.IsOptional(typeof(Optional<>));
 
         // Assert
         result.ShouldBeFalse();
     }
 
     [Fact]
-    public void IsResult_ShouldReturnFalseWhenNotGivenResultType()
+    public void IsOptional_ShouldReturnFalseWhenNotGivenResultType()
     {
         // Act
-        var result = Result.IsResult(typeof(int));
+        var result = Optional.IsOptional(typeof(int));
 
         // Assert
         result.ShouldBeFalse();
     }
 
     [Fact]
-    public void IsResult_ShouldReturnTrueWhenGivenBoundResultType()
+    public void IsOptional_ShouldReturnTrueWhenGivenBoundResultType()
     {
         // Act
-        var result = Result.IsResult(typeof(Result<int>));
+        var result = Optional.IsOptional(typeof(Optional<int>));
 
         // Assert
         result.ShouldBeTrue();
@@ -106,7 +109,7 @@ public class ResultTests
     public void GetUnderlyingType_ShouldThrowWhenGivenNull()
     {
         // Arrange
-        Action act = () => Result.GetUnderlyingType(null!);
+        Action act = () => Optional.GetUnderlyingType(null!);
 
         // Assert
         act.ShouldThrow<ArgumentNullException>();
@@ -116,7 +119,7 @@ public class ResultTests
     public void GetUnderlyingType_ShouldReturnNullWhenGivenUnboundResultType()
     {
         // Act
-        var result = Result.GetUnderlyingType(typeof(Result<>));
+        var result = Optional.GetUnderlyingType(typeof(Optional<>));
 
         // Assert
         result.ShouldBeNull();
@@ -126,7 +129,7 @@ public class ResultTests
     public void GetUnderlyingType_ShouldReturnNullWhenNotGivenResultType()
     {
         // Act
-        var result = Result.GetUnderlyingType(typeof(int));
+        var result = Optional.GetUnderlyingType(typeof(int));
 
         // Assert
         result.ShouldBeNull();
@@ -136,7 +139,7 @@ public class ResultTests
     public void GetUnderlyingType_ShouldReturnUnderlyingTypeWhenGivenBoundResultType()
     {
         // Act
-        var result = Result.GetUnderlyingType(typeof(Result<int>));
+        var result = Optional.GetUnderlyingType(typeof(Optional<int>));
 
         // Assert
         result.ShouldBe(typeof(int));
@@ -146,7 +149,7 @@ public class ResultTests
     public void Try_ShouldThrowWhenGivenNullAction()
     {
         // Arrange
-        Action act = () => Result.Try<int>(null!);
+        Action act = () => Optional.Try<int>(null!);
 
         // Assert
         act.ShouldThrow<ArgumentNullException>();
@@ -161,28 +164,29 @@ public class ResultTests
         A.CallTo(fakeFactory).Throws(exception);
 
         // Act
-        var result = Result.Try(fakeFactory);
+        var result = Optional.Try(fakeFactory);
 
         // Assert
         A.CallTo(fakeFactory).MustHaveHappenedOnceExactly();
-        result.IsSuccessful.ShouldBeFalse();
-        result.IsFailure.ShouldBeTrue();
-        result.Error.ShouldNotBeNull();
-        result.Error.ShouldBeSameAs(exception);
+        result.IsDefault.ShouldBeFalse();
+        result.IsEmpty.ShouldBeTrue();
     }
 
     [Fact]
-    public void Try_ShouldReturnSuccessWhenActionCompletesSuccessfully()
+    public void Try_ShouldReturnEmptyWhenActionCompletesSuccessfullyButValueIsNull()
     {
         // Arrange
-        var fakeFactory = A.Fake<Func<int>>();
+        var fakeFactory = A.Fake<Func<string>>();
+        A.CallTo(() => fakeFactory())!.Returns(null);
 
         // Act
-        var result = Result.Try(fakeFactory);
+        var result = Optional.Try(fakeFactory);
 
         // Assert
         A.CallTo(fakeFactory).MustHaveHappenedOnceExactly();
-        result.IsSuccessful.ShouldBeTrue();
+        result.IsDefault.ShouldBeFalse();
+        result.IsEmpty.ShouldBeTrue();
+        result.ValueKind.ShouldBe(Optional.NullValueKind);
     }
 
     [Fact]
@@ -196,7 +200,7 @@ public class ResultTests
     }
 
     [Fact]
-    public async Task TryAsync_ShouldReturnFailureWhenCancelled()
+    public async Task TryAsync_ShouldReturnEmptyWhenCancelled()
     {
         // Arrange
         var fakeFactory = A.Fake<Func<CancellationToken, Task<int>>>();
@@ -204,14 +208,12 @@ public class ResultTests
         await cts.CancelAsync();
 
         // Act
-        var result = await Result.TryAsync(fakeFactory, cts.Token);
+        var result = await Optional.TryAsync(fakeFactory, cts.Token);
 
         // Assert
         A.CallTo(fakeFactory).MustNotHaveHappened();
-        result.IsSuccessful.ShouldBeFalse();
-        result.IsFailure.ShouldBeTrue();
-        result.Error.ShouldNotBeNull();
-        result.Error.ShouldBeOfType<OperationCanceledException>();
+        result.IsDefault.ShouldBeFalse();
+        result.IsEmpty.ShouldBeTrue();
     }
 
     [Fact]
@@ -223,13 +225,11 @@ public class ResultTests
         Task<int> Factory(CancellationToken _) => Task.FromException<int>(exception);
 
         // Act
-        var result = await Result.TryAsync(Factory);
+        var result = await Optional.TryAsync(Factory);
 
         // Assert
-        result.IsSuccessful.ShouldBeFalse();
-        result.IsFailure.ShouldBeTrue();
-        result.Error.ShouldNotBeNull();
-        result.Error.ShouldBeSameAs(exception);
+        result.IsDefault.ShouldBeFalse();
+        result.IsEmpty.ShouldBeTrue();
     }
 
     [Fact]
@@ -241,43 +241,40 @@ public class ResultTests
         A.CallTo(() => fakeFactory(A<CancellationToken>._)).Throws(exception);
 
         // Act
-        var result = await Result.TryAsync(fakeFactory);
+        var result = await Optional.TryAsync(fakeFactory);
 
         // Assert
         A.CallTo(fakeFactory).MustHaveHappenedOnceExactly();
-        result.IsSuccessful.ShouldBeFalse();
-        result.IsFailure.ShouldBeTrue();
-        result.Error.ShouldNotBeNull();
-        result.Error.ShouldBeSameAs(exception);
+        result.IsDefault.ShouldBeFalse();
+        result.IsEmpty.ShouldBeTrue();
     }
 
     [Fact]
     public async Task FromTaskAsync_ShouldThrowWhenGivenNullTask()
     {
         // Arrange
-        var act = () => Result.FromTaskAsync<int>(null!).AsTask();
+        var act = () => Optional.FromTaskAsync<int>(null!).AsTask();
 
         // Assert
         await act.ShouldThrowAsync<ArgumentNullException>();
     }
 
     [Fact]
-    public async Task FromTaskAsync_ShouldReturnSuccessWhenTaskCompletesSuccessfully()
+    public async Task FromTaskAsync_ShouldReturnNonEmptyWhenTaskCompletesSuccessfully()
     {
         // Arrange
         var task = Task.FromResult(42);
 
         // Act
-        var result = await Result.FromTaskAsync(task);
+        var optional = await Optional.FromTaskAsync(task);
 
         // Assert
-        result.IsSuccessful.ShouldBeTrue();
-        result.IsFailure.ShouldBeFalse();
-        result.Error.ShouldBeNull();
+        optional.IsDefaultOrEmpty.ShouldBeFalse();
+        optional.Value.ShouldBe(42);
     }
 
     [Fact]
-    public async Task FromTaskAsync_ShouldWaitForTaskToCompleteAndReturnSuccess()
+    public async Task FromTaskAsync_ShouldWaitForTaskToCompleteAndReturnNonEmpty()
     {
         async Task<int> Factory()
         {
@@ -287,17 +284,15 @@ public class ResultTests
 
         // Act
         var task = Factory();
-        var result = await Result.FromTaskAsync(task);
+        var optional = await Optional.FromTaskAsync(task);
 
         // Assert
-        result.IsSuccessful.ShouldBeTrue();
-        result.IsFailure.ShouldBeFalse();
-        result.Error.ShouldBeNull();
-        result.Value.ShouldBe(42);
+        optional.IsDefaultOrEmpty.ShouldBeFalse();
+        optional.Value.ShouldBe(42);
     }
 
     [Fact]
-    public async Task FromTaskAsync_ShouldReturnFailureWhenCancelled()
+    public async Task FromTaskAsync_ShouldReturnEmptyWhenCancelled()
     {
         // Arrange
         using var cts = new CancellationTokenSource();
@@ -305,13 +300,11 @@ public class ResultTests
         var task = Task.FromCanceled<int>(cts.Token);
 
         // Act
-        var result = await Result.FromTaskAsync(task);
+        var optional = await Optional.FromTaskAsync(task);
 
         // Assert
-        result.IsSuccessful.ShouldBeFalse();
-        result.IsFailure.ShouldBeTrue();
-        result.Error.ShouldNotBeNull();
-        result.Error.ShouldBeOfType<TaskCanceledException>();
+        optional.IsDefault.ShouldBeFalse();
+        optional.IsEmpty.ShouldBeTrue();
     }
 
     [Fact]
@@ -328,12 +321,10 @@ public class ResultTests
 
         // Act
         var task = Factory();
-        var result = await Result.FromTaskAsync(task);
+        var optional = await Optional.FromTaskAsync(task);
 
         // Assert
-        result.IsSuccessful.ShouldBeFalse();
-        result.IsFailure.ShouldBeTrue();
-        result.Error.ShouldNotBeNull();
-        result.Error.ShouldBeSameAs(exception);
+        optional.IsDefault.ShouldBeFalse();
+        optional.IsEmpty.ShouldBeTrue();
     }
 }

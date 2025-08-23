@@ -58,8 +58,8 @@ public readonly struct Result<T> where T : notnull
         var edi = other._exceptionDispatchInfo ?? other._value._exceptionDispatchInfo;
         if (edi is not null)
         {
-            _initialized = true;
             Unsafe.SkipInit(out _value);
+            _initialized = true;
             _exceptionDispatchInfo = edi;
         }
         else
@@ -169,23 +169,24 @@ public readonly struct Result<T> where T : notnull
     }
 
     /// <summary>
-    /// Retrieves the stored value if the operation is successful; otherwise, returns the default value of
+    /// Retrieves the current value if the result is successful; otherwise, returns the default value of
     /// the underlying type.
     /// </summary>
     /// <returns>
-    /// The stored value if the operation is successful; otherwise, the default value of the underlying type.
+    /// The current value if the result is successful; otherwise, the default value of the underlying type.
     /// </returns>
     [Pure, ExcludeFromCodeCoverage]
     public T? ValueOrDefault() => ValueOr(default);
 
     /// <summary>
-    /// Gets the value stored in the result if the operation was successful; otherwise, returns the provided
-    /// <paramref name="alternative"/>.
+    /// Returns the current value if the result is successful; otherwise, returns the specified alternative value.
     /// </summary>
+    /// <param name="alternative">The value to return if the result is not successful.</param>
     /// <returns>
-    /// The value stored in the result if successful; otherwise, the provided <paramref name="alternative"/>.
+    /// The current value if the result is successful; otherwise, the alternative value.
     /// </returns>
     [Pure]
+    [return: NotNullIfNotNull(nameof(alternative))]
     public T? ValueOr(T? alternative) => IsSuccessful ? _value : alternative;
 
     /// <summary>
@@ -208,8 +209,8 @@ public readonly struct Result<T> where T : notnull
     /// Returns a new <see cref="Result{T}"/> instance with a specified default value if the current
     /// result is a failure.
     /// </summary>
-    /// <param name="factory">A function to invoke if the result is a failure. It provides the exception from the
-    /// failure and returns a value to be used.</param>
+    /// <param name="factory">A delegate that is invoked to produce a new <see cref="Result{T}"/> if the current
+    /// result is not successful.</param>
     /// <returns>
     /// A new <see cref="Result{T}"/> instance with the value returned by the <paramref name="factory"/> function
     /// if the result is a failure, otherwise the current result.
@@ -236,6 +237,42 @@ public readonly struct Result<T> where T : notnull
     }
 
     /// <summary>
+    /// Returns the current successful result if it exists; otherwise, invokes the specified factory
+    /// function to produce a new result.
+    /// </summary>
+    /// <param name="factory">A delegate that is invoked to produce a new <see cref="Result{T}"/> if the current
+    /// result is not successful.</param>
+    /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
+    /// <returns>
+    /// A new result that is either the current successful result or the result produced by the factory function.
+    /// If an exception occurs while invoking the factory, a failure result containing the exception is returned.
+    /// </returns>
+    [Pure]
+    public async ValueTask<Result<T>> OrAsync(
+        Func<Exception, CancellationToken, Task<T?>> factory,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(factory);
+        ThrowIfUninitialized();
+
+        if (IsSuccessful)
+        {
+            return this;
+        }
+
+        try
+        {
+            var task = await factory(Error, cancellationToken).ConfigureAwait(false);
+            return new Result<T>(task);
+        }
+        catch (Exception e)
+        {
+            return new Result<T>(ExceptionDispatchInfo.Capture(e));
+        }
+    }
+
+    /// <summary>
     /// Returns the original result if it is successful; otherwise, returns the specified alternative result.
     /// </summary>
     /// <param name="alternative">The alternative result to return if the original result is a failure.</param>
@@ -243,13 +280,16 @@ public readonly struct Result<T> where T : notnull
     /// The original result if it is successful; otherwise, the specified alternative result.
     /// </returns>
     [Pure]
-    public Result<T> OrElse(in Result<T> alternative) => IsSuccessful ? this : alternative;
+    public Result<T> OrElse(in Result<T> alternative)
+    {
+        ThrowIfUninitialized();
+        return IsSuccessful ? this : alternative;
+    }
 
     /// <summary>
     /// Returns the current <see cref="Result{T}"/> if it is successful; otherwise, invokes the specified factory and
     /// returns the result produced by the factory.
     /// </summary>
-    /// <typeparam name="T">The type of the underlying value.</typeparam>
     /// <param name="factory">A delegate that is invoked to produce a new <see cref="Result{T}"/> if the current
     /// result is not successful.</param>
     /// <returns>
@@ -257,9 +297,10 @@ public readonly struct Result<T> where T : notnull
     /// </returns>
     /// <exception cref="ArgumentNullException">Thrown when the factory is <c>null</c>.</exception>
     [Pure]
-    public Result<T> OrElse(Func<Exception?, Result<T>> factory)
+    public Result<T> OrElse(Func<Exception, Result<T>> factory)
     {
         ArgumentNullException.ThrowIfNull(factory);
+        ThrowIfUninitialized();
         if (IsSuccessful)
         {
             return this;
@@ -276,139 +317,38 @@ public readonly struct Result<T> where T : notnull
     }
 
     /// <summary>
-    /// Executes the specified action if the result is successful, passing the result value to the action.
+    /// Asynchronously returns the current <see cref="Result{T}"/> if it is successful; otherwise, invokes the
+    /// specified factory and returns the result produced by the factory.
     /// </summary>
-    /// <param name="onSuccess">The action to execute if the result is successful. This action receives the result
-    /// value as its parameter.</param>
-    public void OnSuccess(Action<T?> onSuccess)
+    /// <param name="factory">A delegate that is invoked to produce a new <see cref="Result{T}"/> if the current
+    /// result is not successful.</param>
+    /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
+    /// <returns>
+    /// A task that resolves to the current result if it is successful, or the result returned by the factory
+    /// function in case of a failure.
+    /// </returns>
+    [Pure]
+    public async ValueTask<Result<T>> OrElseAsync(
+        Func<Exception, CancellationToken, Task<Result<T>>> factory,
+        CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(onSuccess);
-        ThrowIfUninitialized();
-        if (!IsSuccessful)
-        {
-            return;
-        }
-
-        onSuccess(Value);
-    }
-
-    /// <summary>
-    /// Executes the specified action if the result represents a failure,
-    /// allowing custom handling of the exception.
-    /// </summary>
-    /// <param name="onFailure">The action to execute. Receives the exception as an argument.</param>
-    public void OnFailure(Action<Exception> onFailure)
-    {
-        ArgumentNullException.ThrowIfNull(onFailure);
-        ThrowIfUninitialized();
-        if (!IsFailure)
-        {
-            return;
-        }
-
-        onFailure(Error);
-    }
-
-    /// <summary>
-    /// Executes one of the provided actions depending on whether the result is successful or a failure.
-    /// </summary>
-    /// <param name="onSuccess">The action to execute if the result is successful.</param>
-    /// <param name="onFailure">The action to execute if the result is a failure.</param>
-    public void Match(Action<T> onSuccess, Action<Exception> onFailure)
-    {
-        ArgumentNullException.ThrowIfNull(onSuccess);
-        ArgumentNullException.ThrowIfNull(onFailure);
+        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentNullException.ThrowIfNull(factory);
         ThrowIfUninitialized();
 
         if (IsSuccessful)
         {
-            onSuccess(Value);
+            return this;
         }
-        else if (IsFailure)
+
+        try
         {
-            onFailure(Error);
+            return await factory(Error, cancellationToken).ConfigureAwait(false);
         }
-    }
-
-    /// <summary>
-    /// Asynchronously executes one of the provided actions depending on whether the result is successful
-    /// or a failure.
-    /// </summary>
-    /// <param name="onSuccess">The action to execute when the result is successful.</param>
-    /// <param name="onFailure">The action to execute when the result is a failure.</param>
-    /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-    /// <returns>
-    /// A task representing the asynchronous operation.
-    /// </returns>
-    public async ValueTask MatchAsync(
-        Func<T, CancellationToken, Task> onSuccess,
-        Func<Exception, CancellationToken, Task> onFailure,
-        CancellationToken cancellationToken = default)
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        ArgumentNullException.ThrowIfNull(onSuccess);
-        ArgumentNullException.ThrowIfNull(onFailure);
-        ThrowIfUninitialized();
-
-        if (IsSuccessful)
+        catch (Exception e)
         {
-            await onSuccess(Value, cancellationToken).ConfigureAwait(false);
+            return new Result<T>(ExceptionDispatchInfo.Capture(e));
         }
-        else if (IsFailure)
-        {
-            await onFailure(Error, cancellationToken).ConfigureAwait(false);
-        }
-    }
-
-    /// <summary>
-    /// Transforms the result of the operation into a value of type <typeparamref name="TOutput"/>
-    /// by applying a function on the success value or the failure exception.
-    /// </summary>
-    /// <typeparam name="TOutput">The type of the value to return.</typeparam>
-    /// <param name="onSuccess">A function to process the result value if the operation was successful.</param>
-    /// <param name="onFailure">A function to process the exception if the operation failed.</param>
-    /// <returns>
-    /// A value of type <typeparamref name="TOutput"/> resulting from either applying
-    /// <paramref name="onSuccess"/> on the success value or <paramref name="onFailure"/> on the exception.
-    /// </returns>
-    [Pure]
-    public TOutput Fold<TOutput>(Func<T?, TOutput> onSuccess, Func<Exception, TOutput> onFailure)
-        where TOutput : notnull
-    {
-        ArgumentNullException.ThrowIfNull(onSuccess);
-        ArgumentNullException.ThrowIfNull(onFailure);
-        ThrowIfUninitialized();
-
-        return IsFailure ? onFailure(Error) : onSuccess(Value);
-    }
-
-    /// <summary>
-    /// Asynchronously transforms the result into another value based on the success or failure state.
-    /// </summary>
-    /// <typeparam name="TOutput">The type of the transformed result.</typeparam>
-    /// <param name="onSuccess">A function to invoke if the result is successful, which returns a task that
-    /// produces a transformed value.</param>
-    /// <param name="onFailure">A function to invoke if the result is a failure, which returns a task that
-    /// produces a transformed value.</param>
-    /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
-    /// <returns>
-    /// A task representing the asynchronous operation. The result of the task is the transformed value.
-    /// </returns>
-    [Pure]
-    public Task<TOutput> FoldAsync<TOutput>(
-        Func<T?, CancellationToken, Task<TOutput>> onSuccess,
-        Func<Exception, CancellationToken, Task<TOutput>> onFailure,
-        CancellationToken cancellationToken = default)
-        where TOutput : notnull
-    {
-        cancellationToken.ThrowIfCancellationRequested();
-        ArgumentNullException.ThrowIfNull(onSuccess);
-        ArgumentNullException.ThrowIfNull(onFailure);
-        ThrowIfUninitialized();
-
-        return IsFailure
-            ? onFailure(Error, cancellationToken)
-            : onSuccess(Value, cancellationToken);
     }
 
     /// <summary>
@@ -422,7 +362,7 @@ public readonly struct Result<T> where T : notnull
     /// </returns>
     /// <exception cref="ArgumentNullException">Thrown if <paramref name="transform"/> is <c>null</c>.</exception>
     [Pure]
-    public Result<TOutput> Map<TOutput>(Func<T?, TOutput?> transform)
+    public Result<TOutput> Map<TOutput>(Func<T, TOutput?> transform)
         where TOutput : notnull
     {
         ArgumentNullException.ThrowIfNull(transform);
@@ -450,7 +390,7 @@ public readonly struct Result<T> where T : notnull
     /// </summary>
     /// <typeparam name="TOutput">The type of the result after mapping.</typeparam>
     /// <param name="transform">The mapping function to be applied to the <typeparamref name="T"/>.</param>
-    /// <param name="cancellationToken">A <see cref="CancellationToken"/> to observe while waiting for the task to complete.</param>
+    /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
     /// <returns>
     /// A task that represents the asynchronous operation. The task result contains the mapped
     /// <see cref="Result{TOutput}"/>.
@@ -459,7 +399,7 @@ public readonly struct Result<T> where T : notnull
     /// <exception cref="OperationCanceledException">Thrown when the <paramref name="cancellationToken"/> is canceled.</exception>
     [Pure]
     public async ValueTask<Result<TOutput>> MapAsync<TOutput>(
-        Func<T?, CancellationToken, Task<TOutput?>> transform,
+        Func<T, CancellationToken, Task<TOutput?>> transform,
         CancellationToken cancellationToken = default)
         where TOutput : notnull
     {
@@ -550,16 +490,18 @@ public readonly struct Result<T> where T : notnull
     /// <returns>
     /// The value of the result if successful, otherwise the fallback value.
     /// </returns>
-    public static T? operator |(in Result<T> left, T? right) =>
-        left.ValueOr(right);
+    [ExcludeFromCodeCoverage]
+    [return: NotNullIfNotNull(nameof(right))]
+    public static T? operator |(in Result<T> left, T? right) => left.ValueOr(right);
 
     /// <summary>
-    /// Selects the first successful result in a logical OR operation between two results.
+    /// Selects the first successful <see cref="Result{T}"/> in a logical OR operation between two
+    /// <see cref="Result{T}"/>s.
     /// </summary>
-    /// <param name="left">The primary result to evaluate.</param>
-    /// <param name="right">The alternative result to evaluate if the primary is not successful.</param>
+    /// <param name="left">The primary <see cref="Optional{T}"/>.</param>
+    /// <param name="right">The alternative <see cref="Optional{T}"/>.</param>
     /// <returns>
-    /// The first successful result, or the alternative if the primary is not successful.
+    /// The first successful <see cref="Optional{T}"/>.
     /// </returns>
     public static Result<T> operator |(in Result<T> left, in Result<T> right) =>
         left.IsSuccessful ? left : right;
